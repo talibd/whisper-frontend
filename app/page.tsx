@@ -1,103 +1,130 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from "react";
+import axios from "axios";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [file, setFile] = useState<File | null>(null);
+  const [language, setLanguage] = useState(""); // optional
+  const [transcript, setTranscript] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [videoFilename, setVideoFilename] = useState("");
+  const [detectedLanguage, setDetectedLanguage] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setLoading(true);
+    setTranscript("");
+    setVideoFilename("");
+    setDetectedLanguage("");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (language) {
+      formData.append("language", language);
+    }
+
+    try {
+      // 1) Call our Next.js API route
+      const res = await axios.post("/api/transcribe", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // Expecting { text: string, videoFilename: string }
+      setTranscript(res.data.text);
+      setVideoFilename(res.data.videoFilename);
+      setDetectedLanguage(res.data.detectedLanguage);
+    } catch (err) {
+      console.error(err);
+      alert("Transcription failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Whisper Transcriber</h1>
+
+      <input
+        type="file"
+        accept="video/mp4,audio/*"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        className="mb-4"
+      />
+
+      <div className="mb-4">
+        <label className="block mb-1 font-semibold">Select Language (optional)</label>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="border p-2 rounded w-full max-w-xs"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <option className="text-black" value="">
+            Auto Detect
+          </option>
+          <option className="text-black" value="en">
+            English
+          </option>
+          <option className="text-black" value="hi">
+            Hindi
+          </option>
+          <option className="text-black" value="es">
+            Spanish
+          </option>
+          <option className="text-black" value="fr">
+            French
+          </option>
+          <option className="text-black" value="ar">
+            Arabic
+          </option>
+          <option className="text-black" value="zh">
+            Chinese
+          </option>
+          {/* Add more languages as needed */}
+        </select>
+      </div>
+
+      <button onClick={handleUpload} className="bg-blue-500 text-white px-4 py-2 rounded">
+        Transcribe
+      </button>
+
+      {loading && <p className="mt-4">Transcribing...</p>}
+
+      <div className="flex flex-col md:flex-row justify-between items-start mt-4 gap-8">
+        {transcript && (
+          <div className="mt-6 w-full md:w-1/2">
+            <h2 className="font-semibold">Transcript:</h2>
+            {detectedLanguage && <p className="text-sm text-gray-600 mb-2">Detected Language: {detectedLanguage.toUpperCase()}</p>}
+            <pre className="bg-gray-100 whitespace-break-spaces text-black p-4 rounded">
+              {transcript}
+            </pre>
+          </div>
+        )}
+
+        {videoFilename && (
+          <div className="w-full md:w-1/2 flex flex-col items-center mt-6 md:mt-0">
+            {/* NOTE: We’re fetching from our Next.js API route instead of Flask */}
+            <video
+              src={`/api/download-video/${videoFilename}`}
+              controls
+              width={400}
+            >
+            
+            
+            </video>
+            <a
+              href={`/api/download-video/${videoFilename}`}
+              className="text-blue-600 underline"
+              download
+            >
+              Download
+            </a>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
