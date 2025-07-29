@@ -1,6 +1,5 @@
 'use client'
 import React, { useState } from 'react'
-import { Pen, RefreshCcw } from 'lucide-react';
 import Image from 'next/image';
 
 interface SegmentCardProps {

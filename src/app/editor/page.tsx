@@ -4,6 +4,9 @@ import VideoCard from "@/components/editor/VideoCard";
 import SegmentSetting from "@/components/editor/SegmentSetting";
 import {Button} from "@/components/ui/button";
 import ExportButton from "@/components/editor/ExportButton";
+import SegmentStyle from "@/components/editor/SegmentStyle";
+import MyColorPicker from "@/components/editor/MyColorPicker";
+import SuggestionBox from "@/components/editor/SuggestionBox";
 
 function page() {
   return (
@@ -19,11 +22,13 @@ function page() {
       <div className="col-span-5 row-span-5 col-start-3 flex items-center justify-center">
         <VideoCard />
       </div>
-      <div className="col-span-2 row-span-5 flex flex-col  col-start-8   p-3">
+      <div className="col-span-2 row-span-5 flex flex-col   col-start-8 p-3">
        <ExportButton />
-        <div className="px-3 mt-5">
+        <div className=" mt-5">
           <SegmentSetting  />
+          <SegmentStyle/>
         </div>
+          <SuggestionBox/>
       </div>
     </div>
   );
