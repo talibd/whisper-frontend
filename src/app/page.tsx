@@ -14,7 +14,7 @@ export default function Home() {
   const [segments, setSegments] = useState<any[]>([]);
   const [brollImages, setBrollImages] = useState<{ [kw: string]: string | null }>({});
   const [brollError, setBrollError] = useState<string | null>(null);
-  const [wordsPerSubtitle, setWordsPerSubtitle] = useState<number>(5); // Simplified default
+  const [wordsPerSubtitle, setWordsPerSubtitle] = useState<number>(7); // New state for words per subtitle
   const baseUrl = "http://localhost:8080"
 
   // Step 1: Transcribe
@@ -50,6 +50,7 @@ export default function Home() {
     }
   };
   
+  
   // Step 2: Extract Keywords (optional)
   const handleExtractKeywords = async () => {
     if (!transcript) return;
@@ -68,7 +69,7 @@ export default function Home() {
     }
   };
 
-  // Step 3: Generate Video
+  // Step 3: Generate Video - Enhanced with words per subtitle
   const handleGenerateVideo = async () => {
     if (!file || !transcript) return alert("Transcript and file required");
     
@@ -84,8 +85,9 @@ export default function Home() {
     formData.append("words", JSON.stringify(words));
     formData.append("keywords", JSON.stringify(keywords));
     formData.append("broll_images", JSON.stringify(brollImages));
-    formData.append("words_per_subtitle", wordsPerSubtitle.toString());
+    formData.append("words_per_subtitle", wordsPerSubtitle.toString()); // Add words per subtitle
     
+    // Also send segments if available
     if (segments.length > 0) {
       formData.append("transcribed_segments", JSON.stringify(segments));
     }
@@ -130,12 +132,12 @@ export default function Home() {
     }
   };
 
-  // Simplified preview - show first 2 subtitle groups
+  // Preview subtitle segments based on current settings
   const getSubtitlePreview = () => {
     if (!words.length || wordsPerSubtitle <= 0) return [];
     
     const preview = [];
-    for (let i = 0; i < Math.min(words.length, wordsPerSubtitle * 2); i += wordsPerSubtitle) {
+    for (let i = 0; i < Math.min(words.length, 21); i += wordsPerSubtitle) { // Show first 3 groups max
       const group = words.slice(i, i + wordsPerSubtitle);
       const text = group.map(w => w.text).join(' ');
       const start = group[0]?.start || 0;
@@ -201,52 +203,80 @@ export default function Home() {
           </div>
         )}
 
-        {/* Step 2: Show transcript and simplified settings */}
+        {/* Step 2: Show transcript and settings */}
         {transcript && (
           <div className="mt-6">
             <h2 className="font-semibold text-lg mb-2">📝 Transcript:</h2>
             <pre className="bg-gray-100 p-4 rounded whitespace-pre-wrap max-h-40 overflow-y-auto text-sm">{transcript}</pre>
 
-            {/* Simplified Subtitle Settings */}
+            {/* Subtitle Settings */}
             {words.length > 0 && (
               <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                <h3 className="font-semibold text-lg mb-3">⚙️ Subtitle Length</h3>
+                <h3 className="font-semibold text-lg mb-3">⚙️ Subtitle Settings</h3>
                 
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium">Words per subtitle:</span>
-                  <div className="flex items-center space-x-3">
-                    {[3, 5, 7].map((value) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Words per subtitle line:
+                    </label>
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="range"
+                        min="1"
+                        max="12"
+                        value={wordsPerSubtitle}
+                        onChange={(e) => setWordsPerSubtitle(parseInt(e.target.value))}
+                        className="flex-1"
+                      />
+                      <span className="bg-blue-100 px-3 py-1 rounded font-medium">
+                        {wordsPerSubtitle} words
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Recommended: 3-7 words for better readability
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Quick presets:
+                    </label>
+                    <div className="flex space-x-2">
                       <button
-                        key={value}
-                        onClick={() => setWordsPerSubtitle(value)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          wordsPerSubtitle === value 
-                            ? 'bg-blue-500 text-white' 
-                            : 'bg-gray-200 hover:bg-gray-300'
-                        }`}
+                        onClick={() => setWordsPerSubtitle(3)}
+                        className={`px-3 py-1 rounded text-sm ${wordsPerSubtitle === 3 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
                       >
-                        {value} words
+                        Short (3)
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setWordsPerSubtitle(5)}
+                        className={`px-3 py-1 rounded text-sm ${wordsPerSubtitle === 5 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                      >
+                        Medium (5)
+                      </button>
+                      <button
+                        onClick={() => setWordsPerSubtitle(7)}
+                        className={`px-3 py-1 rounded text-sm ${wordsPerSubtitle === 7 ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                      >
+                        Long (7)
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 {/* Subtitle Preview */}
                 <div className="mt-4">
-                  <h4 className="font-medium mb-2">Preview:</h4>
-                  <div className="bg-black rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium mb-2">Preview (first 3 subtitle lines):</h4>
+                  <div className="bg-black rounded p-3 space-y-2 max-h-32 overflow-y-auto">
                     {getSubtitlePreview().map((sub, idx) => (
-                      <div key={idx} className="text-white text-center">
-                        <div className="text-sm">{sub.text}</div>
-                        <div className="text-xs text-gray-400 mt-1">
+                      <div key={idx} className="text-white text-center text-sm">
+                        <div className="text-xs text-gray-400">
                           {sub.start.toFixed(1)}s - {sub.end.toFixed(1)}s
                         </div>
+                        <div>{sub.text}</div>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    Total subtitle segments: ~{Math.ceil(words.length / wordsPerSubtitle)}
-                  </p>
                 </div>
               </div>
             )}
@@ -311,18 +341,18 @@ export default function Home() {
 
             {/* Step 3: Generate Video */}
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded">
-              <h3 className="font-semibold text-green-800 mb-2">🎬 Ready to Generate</h3>
-              <div className="text-sm text-green-700 mb-3">
-                <p>• Subtitles: {wordsPerSubtitle} words per line</p>
-                <p>• Keywords: {keywords.length} extracted</p>
-                <p>• B-roll images: {Object.values(brollImages).filter(Boolean).length} ready</p>
+              <h3 className="font-semibold text-green-800 mb-2">🎬 Ready to Generate Video</h3>
+              <div className="text-sm text-green-700 mb-3 space-y-1">
+                <p>✓ B-roll images will appear exactly when keywords are spoken</p>
+                <p>✓ Subtitles will show {wordsPerSubtitle} words per line</p>
+                <p>✓ Total estimated subtitle lines: {Math.ceil(words.length / wordsPerSubtitle)}</p>
               </div>
               <button
                 onClick={handleGenerateVideo}
                 disabled={loading}
                 className="bg-green-600 text-white px-6 py-3 rounded hover:bg-green-700 disabled:opacity-50"
               >
-                {loading ? "Generating Video..." : "Generate Video"}
+                {loading ? "Generating Video..." : "Generate Video with B-roll & Subtitles"}
               </button>
             </div>
           </div>
@@ -342,7 +372,7 @@ export default function Home() {
             <video
               src={videoUrl}
               controls
-              className="w-full rounded shadow-lg"
+              className="w-[50%] rounded shadow-lg"
             />
           </div>
         )}
