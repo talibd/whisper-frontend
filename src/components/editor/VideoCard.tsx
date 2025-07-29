@@ -1,10 +1,5 @@
 import React from 'react'
 
-interface VideoCardProps {
-    videourl?: string;
-    
-}
-
 export default function VideoCard() {
   return (
     <div>
