@@ -12,7 +12,7 @@ export default function SegmentStyle() {
         <CaseSensitive size={30} />
         </div>
         <div className='min-h-[70px] bg-neutral-700/70 flex items-center justify-center flex-col'>
-        <div className='w-6 h-6 bg-white rounded-full'></div>
+        <MyColorPicker />
         </div>
         <div className='min-h-[70px] bg-neutral-700/70 flex items-center justify-center flex-col'>
         <AlignCenter size={25} />
