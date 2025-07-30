@@ -5,7 +5,7 @@ import SegmentSetting from "@/components/editor/SegmentSetting";
 import {Button} from "@/components/ui/button";
 import ExportButton from "@/components/editor/ExportButton";
 import SegmentStyle from "@/components/editor/SegmentStyle";
-import MyColorPicker from "@/components/editor/MyColorPicker";
+import MyColorPicker from "@/components/editor/sub/MyColorPicker";
 import SuggestionBox from "@/components/editor/SuggestionBox";
 
 function page() {
