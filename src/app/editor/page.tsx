@@ -2,7 +2,7 @@ import React from "react";
 import SegmentCard from "@/components/editor/SegmentCard";
 import VideoCard from "@/components/editor/VideoCard";
 import SegmentSetting from "@/components/editor/SegmentSetting";
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import ExportButton from "@/components/editor/ExportButton";
 import SegmentStyle from "@/components/editor/SegmentStyle";
 import MyColorPicker from "@/components/editor/sub/MyColorPicker";
@@ -16,19 +16,19 @@ function page() {
         <h1 className="text-2xl text-white pt-3 px-4">Layers</h1>
         <hr className="my-4 border-neutral-700" />
         <div className="px-3">
-        <SegmentCard />
+          <SegmentCard />
         </div>
       </div>
       <div className="col-span-5 row-span-5 col-start-3 flex items-center justify-center">
         <VideoCard />
       </div>
       <div className="col-span-2 row-span-5 flex flex-col   col-start-8 p-3">
-       <ExportButton />
+        <ExportButton />
         <div className=" mt-5">
-          <SegmentSetting  />
-          <SegmentStyle/>
+          <SegmentSetting />
+          <SegmentStyle />
         </div>
-          <SuggestionBox/>
+        <SuggestionBox />
       </div>
     </div>
   );

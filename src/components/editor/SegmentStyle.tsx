@@ -7,16 +7,19 @@ import { FontSelect } from './sub/FontSelect';
 import { MySelect } from './sub/MySelect';
 import { CgFontHeight } from "react-icons/cg";
 import { Input } from '../ui/input';
+import { useCurrentStyle, useEditorActions } from '@/store/editorStore'
+
 
 
 export default function SegmentStyle() {
-  const [color, setColor] = useState({ r: 0, g: 0, b: 0, a: 1 });
-  const [fontSize, setFontSize] = useState('12');
+  const currentStyle = useCurrentStyle();
+  const { updateStyle } = useEditorActions();
+
   const fontSizes = Array.from({ length: 33 }, (_, i) => {
     const size = 8 + i * 2; // from 8 to 72
     return { label: size.toString(), value: size.toString() };
   });
-  const [fontWeight, setFontWeight] = useState('500');
+
   const fontWeights = [
     { value: '300', label: 'Light' },
     { value: '400', label: 'Regular' },
@@ -25,6 +28,9 @@ export default function SegmentStyle() {
     { value: '700', label: 'Bold' },
   ];
 
+  const handleStyleChange = (updates: Partial<typeof currentStyle>) => {
+    updateStyle(updates);
+  };
 
   return (
     <>
@@ -44,27 +50,35 @@ export default function SegmentStyle() {
       </div> */}
 
         <div className="grid grid-cols-4 grid-rows-2 gap-2">
-          <div className="col-span-3">
-            <FontSelect />
-          </div>
-          <div className="col-start-4">
-            <MySelect side="bottom" align="end" selectItems={fontSizes} selectedValue={fontSize} onSelect={setFontSize} />
-          </div>
-          <div className="row-start-2 col-span-2 relative">
-            {/* <CgFontHeight size={20} className=' absolute top-2 left-2' />
-            <Input type="number" min="0" max="999" className='pl-2 text-right' value={fontSize}
-              onChange={(e) => {
-                const input = e.target.value.slice(0, 3);
-                setFontSize(input);
-              }} /> */}
-            <MySelect selectItems={fontWeights} selectedValue={fontWeight} onSelect={setFontWeight} />
-
-          </div>
-          <div className="row-start-2 col-span-2">
-            <MyColorPicker color={color} onChange={setColor} />
-          </div>
-          {/* <div className="col-span-2 row-start-2">5</div> */}
+        <div className="col-span-3">
+          <FontSelect 
+            value={currentStyle.fontFamily}
+            onSelect={(fontFamily) => handleStyleChange({ fontFamily })}
+          />
         </div>
+        <div className="col-start-4">
+          <MySelect 
+            side="bottom" 
+            align="end" 
+            selectItems={fontSizes} 
+            selectedValue={currentStyle.fontSize} 
+            onSelect={(fontSize) => handleStyleChange({ fontSize })} 
+          />
+        </div>
+        <div className="row-start-2 col-span-2 relative">
+          <MySelect 
+            selectItems={fontWeights} 
+            selectedValue={currentStyle.fontWeight} 
+            onSelect={(fontWeight) => handleStyleChange({ fontWeight })} 
+          />
+        </div>
+        <div className="row-start-2 col-span-2">
+          <MyColorPicker 
+            color={currentStyle.color} 
+            onChange={(color) => handleStyleChange({ color })} 
+          />
+        </div>
+      </div>
 
       </div>
     </>
