@@ -76,7 +76,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
                   {seg.startTime} - {seg.endTime}
                 </span>
                 <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
+                  {/* <button
                     onClick={(e) => handleDuplicate(e, seg.id)}
                     className="p-1 hover:bg-neutral-600 rounded"
                     title="Duplicate"
@@ -89,7 +89,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
                     title="Delete"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </button> */}
                 </div>
               </div>
               <p className='mt-2 text-neutral-300 text-sm leading-relaxed'>
@@ -131,7 +131,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
                   {seg.startTime} - {seg.endTime}
                 </span>
                 <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
+                  {/* <button
                     onClick={(e) => handleDuplicate(e, seg.id)}
                     className="p-1 bg-neutral-800/90 hover:bg-neutral-700 rounded backdrop-blur"
                     title="Duplicate"
@@ -144,7 +144,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
                     title="Delete"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </button> */}
                 </div>
               </div>
               <span className='text-sm w-fit ml-auto text-neutral-100 bg-neutral-800/90 p-2 leading-normal px-3 rounded-full relative z-10 backdrop-blur'>

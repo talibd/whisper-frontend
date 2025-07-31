@@ -52,8 +52,8 @@ export interface ProjectData {
   videoUrl?: string;
   thumbnail?: string;
   duration?: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // Changed from Date to string for JSON serialization
+  updatedAt: string; // Changed from Date to string for JSON serialization
   segments: SegmentData[];
   globalStyle: StyleSettings;
   settings: EditorSettings;
@@ -164,8 +164,8 @@ export const useEditorStore = create<EditorState>()(
             const newProject: ProjectData = {
               id: generateId(),
               name,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
               segments: [],
               globalStyle: { ...defaultStyle },
               settings: { ...defaultSettings },
@@ -207,7 +207,7 @@ export const useEditorStore = create<EditorState>()(
         saveProject: () => {
           set((state) => {
             if (state.currentProject) {
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
               state.currentProject.globalStyle = { ...state.currentStyle };
               state.currentProject.settings = { ...state.editorSettings };
               
@@ -224,7 +224,7 @@ export const useEditorStore = create<EditorState>()(
           set((state) => {
             if (state.currentProject) {
               Object.assign(state.currentProject, updates);
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
             }
           });
         },
@@ -241,7 +241,7 @@ export const useEditorStore = create<EditorState>()(
               };
               state.currentProject.segments.push(newSegment);
               state.selectedSegmentId = newSegment.id;
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
             }
           });
         },
@@ -252,7 +252,7 @@ export const useEditorStore = create<EditorState>()(
               const segment = state.currentProject.segments.find((s: SegmentData) => s.id === id);
               if (segment) {
                 Object.assign(segment, updates);
-                state.currentProject.updatedAt = new Date();
+                state.currentProject.updatedAt = new Date().toISOString();
               }
             }
           });
@@ -267,7 +267,7 @@ export const useEditorStore = create<EditorState>()(
                 if (state.selectedSegmentId === id) {
                   state.selectedSegmentId = null;
                 }
-                state.currentProject.updatedAt = new Date();
+                state.currentProject.updatedAt = new Date().toISOString();
               }
             }
           });
@@ -305,7 +305,7 @@ export const useEditorStore = create<EditorState>()(
                 };
                 const index = state.currentProject.segments.findIndex((s: SegmentData) => s.id === id);
                 state.currentProject.segments.splice(index + 1, 0, duplicated);
-                state.currentProject.updatedAt = new Date();
+                state.currentProject.updatedAt = new Date().toISOString();
               }
             }
           });
@@ -317,7 +317,7 @@ export const useEditorStore = create<EditorState>()(
               const segments = state.currentProject.segments;
               const [movedSegment] = segments.splice(fromIndex, 1);
               segments.splice(toIndex, 0, movedSegment);
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
             }
           });
         },
@@ -327,7 +327,7 @@ export const useEditorStore = create<EditorState>()(
           set((state) => {
             Object.assign(state.currentStyle, updates);
             if (state.currentProject) {
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
             }
           });
         },
@@ -345,7 +345,7 @@ export const useEditorStore = create<EditorState>()(
               if (segment) {
                 // Store style in segment data (you'd need to extend SegmentData interface)
                 Object.assign(segment, { customStyle: style });
-                state.currentProject.updatedAt = new Date();
+                state.currentProject.updatedAt = new Date().toISOString();
               }
             }
           });
@@ -357,7 +357,7 @@ export const useEditorStore = create<EditorState>()(
             Object.assign(state.editorSettings, updates);
             if (state.currentProject) {
               state.currentProject.settings = { ...state.editorSettings };
-              state.currentProject.updatedAt = new Date();
+              state.currentProject.updatedAt = new Date().toISOString();
             }
           });
         },
@@ -380,12 +380,17 @@ export const useEditorStore = create<EditorState>()(
           set((state) => {
             state.isExporting = false;
             state.exportProgress = 100;
-            setTimeout(() => {
+          });
+          
+          // Reset progress after delay without causing re-renders
+          setTimeout(() => {
+            const currentState = get();
+            if (!currentState.isExporting && currentState.exportProgress === 100) {
               set((state) => {
                 state.exportProgress = 0;
               });
-            }, 2000);
-          });
+            }
+          }, 2000);
         },
 
         // Suggestions
@@ -440,23 +445,6 @@ export const useEditorStore = create<EditorState>()(
         currentProject: state.currentProject,
         suggestions: state.suggestions.slice(0, 10), // Only keep 10 most recent
       }),
-      // Custom serialization for dates
-      serialize: (state: any) => {
-        return JSON.stringify(state, (key, value) => {
-          if (value instanceof Date) {
-            return { __type: 'Date', value: value.toISOString() };
-          }
-          return value;
-        });
-      },
-      deserialize: (str: any) => {
-        return JSON.parse(str, (key, value) => {
-          if (value && value.__type === 'Date') {
-            return new Date(value.value);
-          }
-          return value;
-        });
-      },
     }
   )
 );
@@ -475,5 +463,10 @@ export const useExportState = () => useEditorStore((state) => ({
   progress: state.exportProgress
 }));
 
-// Action hooks for cleaner component usage
+// Stable action selectors to prevent infinite loops
 export const useEditorActions = () => useEditorStore(state => state.actions);
+
+// Individual action selectors for better performance
+export const useStartExport = () => useEditorStore(state => state.actions.startExport);
+export const useUpdateExportProgress = () => useEditorStore(state => state.actions.updateExportProgress);
+export const useFinishExport = () => useEditorStore(state => state.actions.finishExport);

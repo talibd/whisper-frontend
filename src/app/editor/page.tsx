@@ -1,15 +1,17 @@
 import React from "react";
 import SegmentCard from "@/components/editor/SegmentCard";
-import VideoCard from "@/components/editor/VideoCard";
+import VideoCard from "@/components/editor/VideoPreview";
 import SegmentSetting from "@/components/editor/SegmentSetting";
 import { Button } from "@/components/ui/button";
 import ExportButton from "@/components/editor/ExportButton";
 import SegmentStyle from "@/components/editor/SegmentStyle";
 import MyColorPicker from "@/components/editor/sub/MyColorPicker";
 import SuggestionBox from "@/components/editor/SuggestionBox";
+import HydrationWrapper from "@/components/HydrationWrapper";
 
 function page() {
   return (
+    <HydrationWrapper>
     <div className="grid grid-cols-9 grid-rows-5 bg-neutral-900 min-h-screen">
       {/* content side bar  */}
       <div className="col-span-2 row-span-5 bg-neutral-800 border-r border-neutral-700 ">
@@ -31,6 +33,7 @@ function page() {
         <SuggestionBox />
       </div>
     </div>
+    </HydrationWrapper>
   );
 }
 

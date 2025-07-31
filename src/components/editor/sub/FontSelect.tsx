@@ -1,7 +1,7 @@
 // src/components/editor/sub/FontSelect.tsx
 'use client'
 
-import React, { useState, useMemo, useCallback, memo } from 'react'
+import React, { useState, useMemo, useCallback, memo, useEffect } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
 import { useFontManager } from '@/hooks/useFontManager'
@@ -87,12 +87,27 @@ const FontItem = memo(({ index, style, data }: {
 
 FontItem.displayName = 'FontItem';
 
-export const FontSelect = memo(() => {
+interface FontSelectProps {
+  value?: string;
+  onSelect?: (font: string) => void;
+}
+
+export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelectProps) => {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState('');
+  const [internalValue, setInternalValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const { fonts, loading, error, loadFont, retryFetch } = useFontManager();
+
+  // Use controlled value if provided, otherwise use internal state
+  const value = controlledValue !== undefined ? controlledValue : internalValue;
+
+  // Update internal value when controlled value changes
+  useEffect(() => {
+    if (controlledValue !== undefined) {
+      setInternalValue(controlledValue);
+    }
+  }, [controlledValue]);
 
   // Debounce search term to avoid excessive filtering
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -109,7 +124,18 @@ export const FontSelect = memo(() => {
 
   // Memoized font selection handler
   const handleFontSelect = useCallback(async (selectedFont: string) => {
-    setValue(selectedFont === value ? '' : selectedFont);
+    const newValue = selectedFont === value ? '' : selectedFont;
+    
+    // Update internal state if not controlled
+    if (controlledValue === undefined) {
+      setInternalValue(newValue);
+    }
+    
+    // Call external handler if provided
+    if (onSelect) {
+      onSelect(newValue);
+    }
+    
     setOpen(false);
     setSearchTerm(''); // Clear search when selecting
 
@@ -125,7 +151,7 @@ export const FontSelect = memo(() => {
     } catch (error) {
       console.warn(`Failed to load font: ${selectedFont}`);
     }
-  }, [value, loadFont]);
+  }, [value, loadFont, onSelect, controlledValue]);
 
   // Memoized search handler
   const handleSearch = useCallback((search: string) => {
