@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from './ui/switch';
+import { IoSparkles } from "react-icons/io5";
+
 
 export default function VideoUpload() {
     const [step, setStep] = useState(1);
@@ -17,6 +20,7 @@ export default function VideoUpload() {
     const [isMuted, setIsMuted] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
 
     // Determine aspect ratio based on video dimensions
     const getAspectRatio = (width: number, height: number): string => {
@@ -316,34 +320,49 @@ export default function VideoUpload() {
                         </div>
                     </CardContent>
                 </Card>
-                <div className='bg-neutral-800 p-3 absolute top-0 left-full ml-4 rounded-2xl w-[300px] flex items-center justify-center gap-2 flex-col'>
-                    <div className='w-full'>
+                <div className=' absolute top-0 left-full ml-4  w-[300px] flex items-center justify-center gap-2 flex-col'>
+                    <div className='w-full bg-neutral-800 p-3 rounded-xl'>
                         <span className='text-sm text-neutral-200'>info</span>
                         <div className='grid grid-cols-2 gap-2 mt-2'>
                             <span className='text-sm text-neutral-400 '>name:</span>
                             <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>{selectedFile?.name || 'video-file.mp4'}</p>
                             <span className='text-sm text-neutral-400 '>size:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
                             <span className='text-sm text-neutral-400 '>resolution:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
                             <span className='text-sm text-neutral-400 '>duration:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
                             <span className='text-sm text-neutral-400 '>format:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
                         </div>
                     </div>
-                    <div className='p-2 rounded-lg w-full bg-neutral-700/50'>
-                        <span className='text-sm text-neutral-400'></span>
 
+                    <div className='w-full bg-neutral-800 p-2 rounded-xl flex flex-col gap-2'>
+                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
+                            <label htmlFor="transcribe" className='text-sm text-neutral-200'>subtitles</label>
+                             <Switch id="transcribe" />
+                        </div>
+                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
+                            <label htmlFor="brolls" className='text-sm text-neutral-200'>B-rolls</label>
+                             <Switch id="brolls" />
+
+                        </div>
                     </div>
+                    <div className='w-full p-2 bg-neutral-800 rounded-xl flex items-center justify-center'>
+                        <Button size={'lg'} className='w-full' >
+                            <IoSparkles />
+                            Generate
+                            </Button>
+                    </div>
+                  
                 </div>
             </div>
         );
