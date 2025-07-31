@@ -131,8 +131,8 @@ export default function VideoUpload() {
   // Step 2: Upload Progress
   if (step === 2) {
     return (
-      <Card className="w-[500px] h-[300px] bg-neutral-800/70 border-2 border-neutral-300">
-        <CardContent className="h-full flex flex-col items-center justify-center p-8">
+      <Card className="w-[450px]  bg-neutral-800/70 border-2 border-neutral-300">
+        <CardContent className="h-full p-0 flex flex-col items-center justify-center ">
           <div className="w-full max-w-sm space-y-6">
             {/* File Info */}
             <div className="flex items-center space-x-4">
@@ -166,7 +166,7 @@ export default function VideoUpload() {
             </div>
 
             {/* Status Text */}
-            <div className="text-center">
+            {/* <div className="text-center">
               {uploadProgress < 100 ? (
                 <p className="text-muted-foreground text-sm">Uploading video...</p>
               ) : (
@@ -175,7 +175,7 @@ export default function VideoUpload() {
                   <p className="text-green-500 text-sm font-medium">Upload complete!</p>
                 </div>
               )}
-            </div>
+            </div> */}
           </div>
         </CardContent>
       </Card>
