@@ -330,6 +330,14 @@ export default function VideoUpload() {
                             <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
+                            <span className='text-sm text-neutral-400 '>duration:</span>
+                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                                {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
+                            </p>
+                            <span className='text-sm text-neutral-400 '>format:</span>
+                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>
+                                {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
+                            </p>
                         </div>
                     </div>
                     <div className='p-2 rounded-lg w-full bg-neutral-700/50'>
