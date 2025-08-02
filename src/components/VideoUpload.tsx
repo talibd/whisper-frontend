@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, Play, CheckCircle, Film, X, FileVideo, Pause, Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -7,23 +7,40 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from './ui/switch';
 import { IoSparkles } from "react-icons/io5";
+import { useCurrentProject, useEditorActions } from '@/store/editorStore';
 
 export default function VideoUpload() {
-    const [step, setStep] = useState(1);
+    const currentProject = useCurrentProject();
+    const { createProject, updateProject, addSegment } = useEditorActions();
+
+    const [step, setStep] = useState(() => {
+        // If there's already a project with a video, start at step 3
+        return currentProject?.videoUrl ? 3 : 1;
+    });
+    
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [videoUrl, setVideoUrl] = useState('');
+    const [videoUrl, setVideoUrl] = useState(currentProject?.videoUrl || '');
     const [videoAspectRatio, setVideoAspectRatio] = useState('16/9');
     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
-    const [videoDuration, setVideoDuration] = useState(0);
+    const [videoDuration, setVideoDuration] = useState(currentProject?.duration || 0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
-    const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
-    const [brollsEnabled, setBrollsEnabled] = useState(false);
+    const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+    const [brollsEnabled, setBrollsEnabled] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    // Update local state when project changes
+    useEffect(() => {
+        if (currentProject?.videoUrl) {
+            setVideoUrl(currentProject.videoUrl);
+            setVideoDuration(currentProject.duration || 0);
+            setStep(3);
+        }
+    }, [currentProject]);
 
     // Determine aspect ratio based on video dimensions
     const getAspectRatio = (width: number, height: number): string => {
@@ -66,6 +83,28 @@ export default function VideoUpload() {
         setVideoAspectRatio(aspectRatio);
         setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
         setVideoDuration(video.duration);
+
+        // Update project with video metadata
+        if (currentProject) {
+            updateProject({
+                duration: video.duration,
+                thumbnail: generateThumbnail(video), // You can implement this
+            });
+        }
+    };
+
+    // Generate thumbnail from video (optional implementation)
+    const generateThumbnail = (video: HTMLVideoElement): string => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.8);
+        }
+        return '';
     };
 
     // Video control functions
@@ -116,7 +155,20 @@ export default function VideoUpload() {
     const handleFile = (file: File) => {
         if (file?.type.startsWith('video/')) {
             setSelectedFile(file);
-            setVideoUrl(URL.createObjectURL(file));
+            const objectUrl = URL.createObjectURL(file);
+            setVideoUrl(objectUrl);
+            
+            // Create or update project with video
+            if (!currentProject) {
+                createProject(`Video Project - ${file.name.split('.')[0]}`);
+            }
+            
+            // Update project with video URL and file info
+            updateProject({
+                videoUrl: objectUrl,
+                name: currentProject?.name || `Video Project - ${file.name.split('.')[0]}`,
+            });
+
             setStep(2);
             simulateUpload();
         } else {
@@ -148,14 +200,62 @@ export default function VideoUpload() {
     // Handle generate button click
     const handleGenerate = () => {
         setIsGenerating(true);
-        // Simulate generation process
+        
+        // Simulate content generation and add demo segments
         setTimeout(() => {
+            if (subtitlesEnabled) {
+                // Add demo subtitle segments
+                addSegment({
+                    type: 'subtitle',
+                    startTime: '00:00',
+                    endTime: '00:05',
+                    content: 'Welcome to our video content. This is the opening segment that introduces the main topic.',
+                    highlightedKeyword: 'Welcome',
+                    isSelected: false,
+                });
+
+                addSegment({
+                    type: 'subtitle',
+                    startTime: '00:05',
+                    endTime: '00:10',
+                    content: 'Here we dive deeper into the subject matter and explore key concepts.',
+                    highlightedKeyword: 'concepts',
+                    isSelected: false,
+                });
+            }
+
+            if (brollsEnabled) {
+                // Add demo B-roll segments
+                addSegment({
+                    type: 'broll',
+                    startTime: '00:10',
+                    endTime: '00:15',
+                    content: 'Technology',
+                    imageUrl: '/demo.jpeg',
+                    isSelected: false,
+                });
+
+                addSegment({
+                    type: 'broll',
+                    startTime: '00:15',
+                    endTime: '00:20',
+                    content: 'Innovation',
+                    imageUrl: '/demo.jpeg',
+                    isSelected: false,
+                });
+            }
+
             setIsGenerating(false);
         }, 5000);
     };
 
-    // Reset to step 1
+    // Reset to step 1 and clear project
     const resetUpload = () => {
+        // Clean up object URL to prevent memory leaks
+        if (videoUrl && videoUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(videoUrl);
+        }
+
         setStep(1);
         setSelectedFile(null);
         setUploadProgress(0);
@@ -166,12 +266,31 @@ export default function VideoUpload() {
         setIsPlaying(false);
         setIsMuted(false);
         setIsGenerating(false);
-        setSubtitlesEnabled(false);
-        setBrollsEnabled(false);
+        setSubtitlesEnabled(true);
+        setBrollsEnabled(true);
+        
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
+
+        // Clear project data
+        if (currentProject) {
+            updateProject({
+                videoUrl: undefined,
+                duration: undefined,
+                thumbnail: undefined,
+            });
+        }
     };
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (videoUrl && videoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(videoUrl);
+            }
+        };
+    }, [videoUrl]);
 
     // Step 1: Upload Area
     if (step === 1) {
@@ -243,8 +362,8 @@ export default function VideoUpload() {
                                             </Badge>
                                         ) : (
                                             <div className="flex items-center space-x-1">
-                                                <CheckCircle size={18} className="text-green-500" />
-                                                <span className="text-green-500 text-sm font-medium">Complete</span>
+                                                <CheckCircle size={18} className="text-white" />
+                                                <span className="text-white text-sm font-medium">Complete</span>
                                             </div>
                                         )}
                                     </div>
@@ -363,18 +482,6 @@ export default function VideoUpload() {
                                 {/* Bottom Controls */}
                                 <div className="absolute bottom-0 left-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <div className="flex justify-between items-end">
-                                        {/* <Button
-                                            onClick={toggleMute}
-                                            size="icon"
-                                            variant="secondary"
-                                            className="w-12 h-12 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
-                                        >
-                                            {isMuted ? (
-                                                <VolumeX size={20} className="text-white" />
-                                            ) : (
-                                                <Volume2 size={20} className="text-white" />
-                                            )}
-                                        </Button> */}
                                         <Badge variant="secondary" className="text-sm bg-black/60 backdrop-blur-sm py-2 px-3 text-white border-white/20 shadow-lg">
                                             {videoAspectRatio}
                                         </Badge>
@@ -404,6 +511,8 @@ export default function VideoUpload() {
                             Video Info
                         </h3>
                         <div className='grid grid-cols-2 gap-3 text-sm'>
+                          
+                            
                             <span className='text-neutral-400 font-medium'>Name:</span>
                             <p title={selectedFile?.name || 'video-file.mp4'} className='text-neutral-200 truncate font-mono text-xs'>
                                 {selectedFile?.name || 'video-file.mp4'}
@@ -428,6 +537,8 @@ export default function VideoUpload() {
                             <p className='text-neutral-200 font-mono text-xs'>
                                 {selectedFile ? getFileFormat(selectedFile.name) : 'MP4'}
                             </p>
+
+                        
                         </div>
                     </div>
 

@@ -41,7 +41,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   
   // Updated to match your backend structure
+  // const baseUrl = "https://aivideo-production-2603.up.railway.app";
   const baseUrl = "http://localhost:8080";
+
 
   // Clear error when starting new action
   const clearError = () => setError(null);
