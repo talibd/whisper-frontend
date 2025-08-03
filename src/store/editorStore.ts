@@ -2,9 +2,31 @@
 'use client'
 
 import { create } from 'zustand'
-
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
+
+// Utility functions for word count processing (defined first to avoid hoisting issues)
+export const timeToSeconds = (timeStr: string): number => {
+  const [minutes, seconds] = timeStr.split(':').map(Number);
+  return minutes * 60 + seconds;
+};
+
+export const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+export const splitTextByWordCount = (text: string, maxWords: number): string[] => {
+  const words = text.split(' ').filter(word => word.trim().length > 0);
+  const chunks: string[] = [];
+  
+  for (let i = 0; i < words.length; i += maxWords) {
+    chunks.push(words.slice(i, i + maxWords).join(' '));
+  }
+  
+  return chunks.length > 0 ? chunks : [text];
+};
 
 // Types for the editor state
 export interface RGBAColor {
@@ -23,7 +45,6 @@ export interface SegmentData {
   highlightedKeyword?: string;
   imageUrl?: string;
   isSelected: boolean;
-
 }
 
 export interface StyleSettings {
@@ -52,12 +73,42 @@ export interface ProjectData {
   videoUrl?: string;
   thumbnail?: string;
   duration?: number;
-  createdAt: string; // Changed from Date to string for JSON serialization
-  updatedAt: string; // Changed from Date to string for JSON serialization
+  createdAt: string;
+  updatedAt: string;
   segments: SegmentData[];
   globalStyle: StyleSettings;
   settings: EditorSettings;
 }
+
+export const processSegmentsWithWordCount = (segments: SegmentData[], wordCount: number): SegmentData[] => {
+  return segments.flatMap(segment => {
+    if (segment.type !== 'subtitle') return [segment];
+    
+    const chunks = splitTextByWordCount(segment.content, wordCount);
+    if (chunks.length === 1) return [segment];
+    
+    const startTime = timeToSeconds(segment.startTime);
+    const endTime = timeToSeconds(segment.endTime);
+    const duration = endTime - startTime;
+    const segmentDuration = duration / chunks.length;
+
+    return chunks.map((chunk, index) => {
+      const segmentStartTime = startTime + (index * segmentDuration);
+      const segmentEndTime = segmentStartTime + segmentDuration;
+      
+      return {
+        ...segment,
+        id: index === 0 ? segment.id : `${segment.id}-chunk-${index}`,
+        content: chunk,
+        startTime: formatTime(segmentStartTime),
+        endTime: formatTime(segmentEndTime),
+        highlightedKeyword: chunk.toLowerCase().includes(segment.highlightedKeyword?.toLowerCase() || '') 
+          ? segment.highlightedKeyword 
+          : undefined
+      };
+    });
+  });
+};
 
 export interface EditorState {
   // Current project data
@@ -117,6 +168,10 @@ export interface EditorState {
     clearAll: () => void;
     undo: () => void;
     redo: () => void;
+    
+    // Word count utilities
+    getProcessedSegments: () => SegmentData[];
+    getEstimatedSegmentCount: () => number;
   };
 }
 
@@ -233,11 +288,9 @@ export const useEditorStore = create<EditorState>()(
         addSegment: (segment: Omit<SegmentData, 'id'>) => {
           set((state) => {
             if (state.currentProject) {
-
               const newSegment: SegmentData = {
                 ...segment,
                 id: generateId(),
-
               };
               state.currentProject.segments.push(newSegment);
               state.selectedSegmentId = newSegment.id;
@@ -433,6 +486,26 @@ export const useEditorStore = create<EditorState>()(
           // TODO: Implement redo functionality
           console.log('Redo not implemented yet');
         },
+
+        // Word count utilities
+        getProcessedSegments: () => {
+          const state = get();
+          if (!state.currentProject?.segments) return [];
+          return processSegmentsWithWordCount(state.currentProject.segments, state.editorSettings.wordCount);
+        },
+
+        getEstimatedSegmentCount: () => {
+          const state = get();
+          if (!state.currentProject?.segments) return 0;
+          
+          return state.currentProject.segments.reduce((total, segment) => {
+            if (segment.type === 'subtitle') {
+              const words = segment.content.split(' ').filter(word => word.trim().length > 0).length;
+              return total + Math.ceil(words / state.editorSettings.wordCount);
+            }
+            return total + 1; // B-roll segments remain the same
+          }, 0);
+        },
       },
     })),
     {
@@ -470,3 +543,7 @@ export const useEditorActions = () => useEditorStore(state => state.actions);
 export const useStartExport = () => useEditorStore(state => state.actions.startExport);
 export const useUpdateExportProgress = () => useEditorStore(state => state.actions.updateExportProgress);
 export const useFinishExport = () => useEditorStore(state => state.actions.finishExport);
+
+// New selectors for word count functionality
+export const useProcessedSegments = () => useEditorStore(state => state.actions.getProcessedSegments());
+export const useEstimatedSegmentCount = () => useEditorStore(state => state.actions.getEstimatedSegmentCount());

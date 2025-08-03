@@ -1,7 +1,16 @@
 'use client'
 import React from 'react'
 import Image from 'next/image'
-import { useEditorActions, useCurrentProject, useSelectedSegment, SegmentData } from '@/store/editorStore'
+import { 
+  useEditorActions, 
+  useCurrentProject, 
+  useSelectedSegment, 
+  useEditorSettings, 
+  SegmentData,
+  timeToSeconds,
+  splitTextByWordCount,
+  formatTime
+} from '@/store/editorStore'
 import { cn } from '@/lib/utils'
 import { Trash2, Copy, Edit } from 'lucide-react'
 
@@ -12,22 +21,46 @@ interface SegmentCardProps {
 function SegmentCard({ segment }: SegmentCardProps) {
   const project = useCurrentProject();
   const selectedSegment = useSelectedSegment();
+  const settings = useEditorSettings();
   const { selectSegment, updateSegment, deleteSegment, duplicateSegment } = useEditorActions();
 
-  // Helper function to convert time string to seconds for sorting
-  const timeToSeconds = (timeStr: string): number => {
-    const [minutes, seconds] = timeStr.split(':').map(Number);
-    return minutes * 60 + seconds;
+  // Helper function to create subtitle segments from text
+  const createSubtitleSegments = (originalSegment: SegmentData): SegmentData[] => {
+    if (originalSegment.type !== 'subtitle') return [originalSegment];
+    
+    const chunks = splitTextByWordCount(originalSegment.content, settings.wordCount);
+    const startTime = timeToSeconds(originalSegment.startTime);
+    const endTime = timeToSeconds(originalSegment.endTime);
+    const duration = endTime - startTime;
+    const segmentDuration = duration / chunks.length;
+
+    return chunks.map((chunk, index) => {
+      const segmentStartTime = startTime + (index * segmentDuration);
+      const segmentEndTime = segmentStartTime + segmentDuration;
+
+      return {
+        ...originalSegment,
+        id: index === 0 ? originalSegment.id : `${originalSegment.id}-chunk-${index}`,
+        content: chunk,
+        startTime: formatTime(segmentStartTime),
+        endTime: formatTime(segmentEndTime),
+        isSelected: selectedSegment?.id === originalSegment.id && index === 0,
+        // Keep highlighted keyword only in the chunk that contains it
+        highlightedKeyword: chunk.toLowerCase().includes(originalSegment.highlightedKeyword?.toLowerCase() || '') 
+          ? originalSegment.highlightedKeyword 
+          : undefined
+      };
+    });
   };
 
   // Use provided segment or create demo segments if none provided
-  const allSegments = segment ? [segment] : project?.segments || [
+  const rawSegments = segment ? [segment] : project?.segments || [
     {
       id: 'demo-1',
       type: 'subtitle' as const,
       startTime: '00:00',
       endTime: '00:10',
-      content: 'This is a brief description of the segment content. It provides an overview of what this segment is about.',
+      content: 'This is a brief description of the segment content. It provides an overview of what this segment is about and demonstrates the word count functionality.',
       highlightedKeyword: 'provides',
       isSelected: selectedSegment?.id === 'demo-1'
     },
@@ -45,7 +78,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
       type: 'subtitle' as const,
       startTime: '00:10',
       endTime: '00:20',
-      content: 'Another subtitle segment that comes after the b-roll.',
+      content: 'Another subtitle segment that comes after the b-roll and shows how longer text gets split into multiple cards based on your word count setting.',
       highlightedKeyword: 'after',
       isSelected: selectedSegment?.id === 'demo-3'
     },
@@ -60,8 +93,12 @@ function SegmentCard({ segment }: SegmentCardProps) {
     }
   ];
 
+  // Process segments to split subtitles based on word count
+  const processedSegments = rawSegments.flatMap(seg => createSubtitleSegments(seg));
+
   // Sort segments by start time, then by type (subtitles first if same time)
-  const sortedSegments = allSegments.sort((a, b) => {
+  // Create a new array using spread operator to avoid mutating the original
+  const sortedSegments = [...processedSegments].sort((a, b) => {
     const timeA = timeToSeconds(a.startTime);
     const timeB = timeToSeconds(b.startTime);
     
@@ -81,7 +118,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
     }
     groups[startTime].push(segment);
     return groups;
-  }, {} as Record<string, typeof allSegments>);
+  }, {} as Record<string, typeof processedSegments>);
 
   const handleSegmentClick = (segmentId: string) => {
     selectSegment(segmentId);
@@ -104,6 +141,10 @@ function SegmentCard({ segment }: SegmentCardProps) {
 
   const renderSegment = (seg: any) => {
     if (seg.type === 'subtitle') {
+      // Check if this is a chunked segment
+      const isChunked = seg.id.includes('-chunk-');
+      const chunkNumber = isChunked ? parseInt(seg.id.split('-chunk-')[1]) + 1 : null;
+      
       return (
         <div 
           className={cn(
@@ -115,25 +156,39 @@ function SegmentCard({ segment }: SegmentCardProps) {
           onClick={() => handleSegmentClick(seg.id)}
         >
           <div className='flex items-center justify-between'>
-            <span className='text-sm text-neutral-400'>
-              {seg.startTime} - {seg.endTime}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className='text-sm text-neutral-400'>
+                {seg.startTime} - {seg.endTime}
+              </span>
+              {chunkNumber && (
+                <span className='text-xs bg-neutral-600 text-neutral-300 px-2 py-1 rounded-full'>
+                  {chunkNumber}
+                </span>
+              )}
+            </div>
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {/* Action buttons commented out as in original */}
             </div>
           </div>
           <p className='mt-2 text-neutral-300 text-sm leading-relaxed'>
-            {seg.content.split(seg.highlightedKeyword || '').map((part, index, array) => (
-              <React.Fragment key={index}>
-                {part}
-                {index < array.length - 1 && seg.highlightedKeyword && (
-                  <span className='bg-amber-100 text-neutral-900 px-1 pb-1 rounded highlighted-keyword'>
-                    {seg.highlightedKeyword}
-                  </span>
-                )}
-              </React.Fragment>
-            ))}
+            {seg.highlightedKeyword ? (
+              seg.content.split(seg.highlightedKeyword).map((part, index, array) => (
+                <React.Fragment key={index}>
+                  {part}
+                  {index < array.length - 1 && (
+                    <span className='bg-amber-100 text-neutral-900 px-1 pb-1 rounded highlighted-keyword'>
+                      {seg.highlightedKeyword}
+                    </span>
+                  )}
+                </React.Fragment>
+              ))
+            ) : (
+              seg.content
+            )}
           </p>
+          <div className='mt-2 text-xs text-neutral-500'>
+            Words: {seg.content.split(' ').length} / {settings.wordCount}
+          </div>
         </div>
       );
     } else {
@@ -177,11 +232,6 @@ function SegmentCard({ segment }: SegmentCardProps) {
     <div className="space-y-4">
       {Object.entries(groupedSegments).map(([startTime, segments]) => (
         <div key={startTime} className="space-y-2">
-          {/* {segments.length > 1 && (
-            <div className="text-xs text-neutral-500 px-2">
-              Timeline: {startTime}
-            </div>
-          )} */}
           {segments.map((seg) => (
             <div key={seg.id}>
               {renderSegment(seg)}

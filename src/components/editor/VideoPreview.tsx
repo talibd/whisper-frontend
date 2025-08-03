@@ -1,6 +1,14 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
-import { useCurrentProject, useSelectedSegment, useCurrentStyle } from '@/store/editorStore'
+import { 
+  useCurrentProject, 
+  useSelectedSegment, 
+  useCurrentStyle, 
+  useEditorSettings,
+  timeToSeconds,
+  splitTextByWordCount,
+  formatTime
+} from '@/store/editorStore'
 import { Play, Pause } from 'lucide-react'
 import Image from 'next/image'
 
@@ -24,15 +32,44 @@ export default function VideoCard() {
   
   const project = useCurrentProject()
   const currentStyle = useCurrentStyle()
+  const settings = useEditorSettings()
+
+  // Helper function to create subtitle segments from text
+  const createSubtitleSegments = (originalSegment: ExtendedSegmentData): ExtendedSegmentData[] => {
+    if (originalSegment.type !== 'subtitle') return [originalSegment];
+    
+    const chunks = splitTextByWordCount(originalSegment.content, settings.wordCount);
+    const startTime = timeToSeconds(originalSegment.startTime);
+    const endTime = timeToSeconds(originalSegment.endTime);
+    const duration = endTime - startTime;
+    const segmentDuration = duration / chunks.length;
+
+    return chunks.map((chunk, index) => {
+      const segmentStartTime = startTime + (index * segmentDuration);
+      const segmentEndTime = segmentStartTime + segmentDuration;
+
+      return {
+        ...originalSegment,
+        id: index === 0 ? originalSegment.id : `${originalSegment.id}-chunk-${index}`,
+        content: chunk,
+        startTime: formatTime(segmentStartTime),
+        endTime: formatTime(segmentEndTime),
+        // Keep highlighted keyword only in the chunk that contains it
+        highlightedKeyword: chunk.toLowerCase().includes(originalSegment.highlightedKeyword?.toLowerCase() || '') 
+          ? originalSegment.highlightedKeyword 
+          : undefined
+      };
+    });
+  };
 
   // Demo segments if no project data
-  const segments = project?.segments || [
+  const rawSegments = project?.segments || [
     {
       id: 'demo-1',
       type: 'subtitle' as const,
       startTime: '00:00',
       endTime: '00:10',
-      content: 'This is a brief description of the segment content. It provides an overview of what this segment is about.',
+      content: 'This is a brief description of the segment content. It provides an overview of what this segment is about and demonstrates the word count functionality.',
       highlightedKeyword: 'provides',
       isSelected: false
     },
@@ -48,11 +85,8 @@ export default function VideoCard() {
     }
   ]
 
-  // Convert time string to seconds
-  const timeToSeconds = (timeStr: string): number => {
-    const [minutes, seconds] = timeStr.split(':').map(Number)
-    return minutes * 60 + seconds
-  }
+  // Process segments to split subtitles based on word count
+  const segments = rawSegments.flatMap(seg => createSubtitleSegments(seg));
 
   // Get active subtitle segments for current time
   const getActiveSubtitles = (time: number) => {
@@ -66,15 +100,19 @@ export default function VideoCard() {
 
   // Get active b-roll based on keyword timing within active subtitle
   const getActiveBroll = (time: number) => {
-    const activeSubtitle = getActiveSubtitles(time)[0]
-    if (!activeSubtitle || !activeSubtitle.highlightedKeyword) return null
+    // Get all active subtitles (there might be multiple chunks)
+    const activeSubtitles = getActiveSubtitles(time);
+    
+    // Find the subtitle with highlighted keyword
+    const subtitleWithKeyword = activeSubtitles.find(subtitle => subtitle.highlightedKeyword);
+    if (!subtitleWithKeyword) return null;
 
     // Find b-roll that corresponds to the highlighted keyword
     const brollSegment = segments.find(segment => {
       if (segment.type !== 'broll') return false
       
       // Check if b-roll keyword matches subtitle's highlighted keyword
-      const keywordMatches = segment.content.toLowerCase() === activeSubtitle.highlightedKeyword?.toLowerCase()
+      const keywordMatches = segment.content.toLowerCase() === subtitleWithKeyword.highlightedKeyword?.toLowerCase()
       
       if (!keywordMatches) return false
 
@@ -86,10 +124,10 @@ export default function VideoCard() {
       }
 
       // Fallback: calculate when keyword appears in subtitle timeline
-      const subtitleStartTime = timeToSeconds(activeSubtitle.startTime)
-      const subtitleDuration = timeToSeconds(activeSubtitle.endTime) - subtitleStartTime
-      const content = activeSubtitle.content
-      const keywordPosition = content.toLowerCase().indexOf(activeSubtitle.highlightedKeyword.toLowerCase())
+      const subtitleStartTime = timeToSeconds(subtitleWithKeyword.startTime)
+      const subtitleDuration = timeToSeconds(subtitleWithKeyword.endTime) - subtitleStartTime
+      const content = subtitleWithKeyword.content
+      const keywordPosition = content.toLowerCase().indexOf(subtitleWithKeyword.highlightedKeyword!.toLowerCase())
       
       if (keywordPosition === -1) return false
 
@@ -198,17 +236,18 @@ export default function VideoCard() {
       
       {/* B-roll Overlay */}
       {activeBroll && activeBroll.imageUrl && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-xl overflow-hidden">
-          <div className="relative w-3/4 h-1/3 rounded-lg overflow-hidden shadow-lg border-2 border-white/30">
+        <div className="absolute inset-0 flex items-center w-full h-full justify-center pointer-events-none  overflow-hidden">
+          <div className="relative flex items-center justify-center rounded-lg w-full h-full overflow-hidden shadow-lg border-2 border-white/30">
             <Image 
               src={activeBroll.imageUrl}
               alt="B-roll content"
-              fill
-              className="object-cover"
+              width={1080}
+              height={1080}
+              className="h-[200px]"
             />
-            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded ">
+            {/* <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded ">
               {activeBroll.content}
-            </div>
+            </div> */}
           </div>
         </div>
       )}
@@ -224,6 +263,13 @@ export default function VideoCard() {
           </div>
         </div>
       )}
+
+      {/* Word Count Indicator */}
+      {/* {activeSubtitle && (
+        <div className="absolute top-4 left-4 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none">
+          Words: {activeSubtitle.content.split(' ').length}/{settings.wordCount}
+        </div>
+      )} */}
 
       {/* Play/Pause Button */}
       <div className="absolute -bottom-15 left-1/2 transform -translate-x-1/2">
