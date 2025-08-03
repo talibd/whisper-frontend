@@ -1,507 +1,197 @@
+// src/components/video/VideoUpload.tsx
 'use client';
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, Play, CheckCircle, Film, X, FileVideo, Pause, Volume2, VolumeX } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { IoSparkles } from "react-icons/io5";
-
+import { VideoUploadArea } from './VideoUploadArea';
+import { VideoUploadProgress } from './VideoUploadProgress';
+import { VideoPreview } from './VideoPreview';
+import { VideoInfo } from './VideoInfo';
 
 export default function VideoUpload() {
-    const [step, setStep] = useState(1);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [dragActive, setDragActive] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [videoUrl, setVideoUrl] = useState('');
-    const [videoAspectRatio, setVideoAspectRatio] = useState('16/9');
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [isGenerating, setIsGenerating] = useState(false);
-     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
-    const [videoDuration, setVideoDuration] = useState(0);
+  const [step, setStep] = useState(1);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoAspectRatio, setVideoAspectRatio] = useState('16/9');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+  const [brollsEnabled, setBrollsEnabled] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-     const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
-    const [brollsEnabled, setBrollsEnabled] = useState(false);
+  // Determine aspect ratio based on video dimensions
+  const getAspectRatio = (width: number, height: number): string => {
+    const ratio = width / height;
 
-    // Determine aspect ratio based on video dimensions
-    const getAspectRatio = (width: number, height: number): string => {
-        const ratio = width / height;
+    // Common aspect ratios with tolerance
+    if (Math.abs(ratio - 16 / 9) < 0.1) return '16/9';      // 1.78 - Widescreen
+    if (Math.abs(ratio - 9 / 16) < 0.1) return '9/16';     // 0.56 - Vertical/Stories
+    if (Math.abs(ratio - 1) < 0.1) return '1/1';           // 1.0 - Square
+    if (Math.abs(ratio - 4 / 3) < 0.1) return '4/3';       // 1.33 - Traditional TV
+    if (Math.abs(ratio - 3 / 4) < 0.1) return '3/4';       // 0.75 - Portrait
+    if (Math.abs(ratio - 21 / 9) < 0.1) return '21/9';     // 2.33 - Ultra-wide
+    if (Math.abs(ratio - 2 / 1) < 0.1) return '2/1';       // 2.0 - Cinema
+    if (Math.abs(ratio - 3 / 2) < 0.1) return '3/2';       // 1.5 - Photo standard
+    if (Math.abs(ratio - 2 / 3) < 0.1) return '2/3';       // 0.67 - Portrait photo
 
-        // Common aspect ratios with tolerance
-        if (Math.abs(ratio - 16 / 9) < 0.1) return '16/9';      // 1.78 - Widescreen
-        if (Math.abs(ratio - 9 / 16) < 0.1) return '9/16';     // 0.56 - Vertical/Stories
-        if (Math.abs(ratio - 1) < 0.1) return '1/1';         // 1.0 - Square
-        if (Math.abs(ratio - 4 / 3) < 0.1) return '4/3';       // 1.33 - Traditional TV
-        if (Math.abs(ratio - 3 / 4) < 0.1) return '3/4';       // 0.75 - Portrait
-        if (Math.abs(ratio - 21 / 9) < 0.1) return '21/9';     // 2.33 - Ultra-wide
-        if (Math.abs(ratio - 2 / 1) < 0.1) return '2/1';       // 2.0 - Cinema
-        if (Math.abs(ratio - 3 / 2) < 0.1) return '3/2';       // 1.5 - Photo standard
-        if (Math.abs(ratio - 2 / 3) < 0.1) return '2/3';       // 0.67 - Portrait photo
+    // Fallback to closest common ratio
+    if (ratio > 1.5) return '16/9';   // Wide videos
+    if (ratio > 0.8) return '4/3';    // Square-ish videos
+    return '9/16';                    // Tall videos
+  };
 
-        // Fallback to closest common ratio
-        if (ratio > 1.5) return '16/9';   // Wide videos
-        if (ratio > 0.8) return '4/3';    // Square-ish videos
-        return '9/16';                    // Tall videos
-    };
+  // Handle video metadata loading
+  const handleVideoLoad = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    const aspectRatio = getAspectRatio(video.videoWidth, video.videoHeight);
+    setVideoAspectRatio(aspectRatio);
+    setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
+    setVideoDuration(video.duration);
+  }, []);
 
-
-      // Format duration to MM:SS
-    const formatDuration = (seconds: number): string => {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    // Get file format from filename
-    const getFileFormat = (filename: string): string => {
-        const extension = filename.split('.').pop()?.toLowerCase();
-        return extension?.toUpperCase() || 'UNKNOWN';
-    };
-
-    // Handle video metadata loading
-    const handleVideoLoad = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-        const video = e.currentTarget;
-        const aspectRatio = getAspectRatio(video.videoWidth, video.videoHeight);
-        setVideoAspectRatio(aspectRatio);
-         setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
-        setVideoDuration(video.duration);
-    };
-
-    // Video control functions
-    const togglePlay = () => {
-        if (videoRef.current && !isGenerating) {
-            if (isPlaying) {
-                videoRef.current.pause();
-            } else {
-                videoRef.current.play();
-            }
-            setIsPlaying(!isPlaying);
-        }
-    };
-
-    const toggleMute = () => {
-        if (videoRef.current && !isGenerating) {
-            videoRef.current.muted = !isMuted;
-            setIsMuted(!isMuted);
-        }
-    };
-
-    const handleVideoPlay = () => setIsPlaying(true);
-    const handleVideoPause = () => setIsPlaying(false);
-    const handleDrag = useCallback((e: React.DragEvent<HTMLInputElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
-    }, []);
-
-    // Handle drop
-    const handleDrop = useCallback((e: React.DragEvent<HTMLInputElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-
-        const files = e.dataTransfer.files;
-        if (files && files[0]) {
-            handleFile(files[0]);
-        }
-    }, []);
-
-    // Handle file selection
-    const handleFile = (file: File) => {
-        if (file?.type.startsWith('video/')) {
-            setSelectedFile(file);
-            setVideoUrl(URL.createObjectURL(file));
-            setStep(2);
-            simulateUpload();
-        } else {
-            alert('Please select a valid video file');
-        }
-    };
-
-    // Simulate upload progress
-    const simulateUpload = () => {
-        setUploadProgress(0);
-        const interval = setInterval(() => {
-            setUploadProgress(prev => {
-                if (prev >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => setStep(3), 500);
-                    return 100;
-                }
-                return prev + Math.random() * 15;
-            });
-        }, 200);
-    };
-
-    // Handle file input click
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleFile(file);
-    };
-
-      // Handle generate button click
-    const handleGenerate = () => {
-        setIsGenerating(true);
-        // Simulate generation process
-        setTimeout(() => {
-            setIsGenerating(false);
-        }, 5000);
-    };
-
-    // Reset to step 1
-    const resetUpload = () => {
-        setStep(1);
-        setSelectedFile(null);
-        setUploadProgress(0);
-        setVideoUrl('');
-        setVideoAspectRatio('16/9');
-         setVideoDimensions({ width: 0, height: 0 });
-        setVideoDuration(0);
-        setIsPlaying(false);
-        setIsMuted(false);
-         setIsGenerating(false);
-        setSubtitlesEnabled(false);
-        setBrollsEnabled(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-    };
-
-    // Step 1: Upload Area
-    if (step === 1) {
-        return (
-            <Card className="w-[500px] h-[300px] bg-neutral-800/70 border-2 border-dashed border-neutral-300 hover:border-neutral-200 transition-colors">
-                <CardContent className="h-full flex flex-col items-center justify-center p-8 relative">
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="video/*"
-                        onChange={handleInputChange}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                    />
-
-                    <div className={`flex flex-col items-center justify-center transition-all duration-200 ${dragActive ? 'scale-105 text-primary' : 'text-muted-foreground'
-                        }`}>
-                        <div className={`p-4 rounded-full mb-4 transition-colors duration-200 ${dragActive ? 'bg-primary/20' : 'bg-muted/50'
-                            }`}>
-                            <Upload size={32} />
-                        </div>
-
-                        <h3 className="text-lg font-semibold mb-2 text-foreground">
-                            {dragActive ? 'Drop your video here' : 'Upload Video'}
-                        </h3>
-
-                        <p className="text-sm text-muted-foreground text-center mb-4">
-                            Drag and drop your video file here or click to browse
-                        </p>
-
-                        <Badge variant="secondary" className="text-xs">
-                            Supported formats: MP4, AVI, MOV, WMV
-                        </Badge>
-                    </div>
-
-                    {dragActive && (
-                        <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-primary border-dashed" />
-                    )}
-                </CardContent>
-            </Card>
-        );
+  // Video control functions
+  const togglePlay = useCallback(() => {
+    if (videoRef.current && !isGenerating) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
     }
+  }, [isPlaying, isGenerating]);
 
-    // Step 2: Upload Progress
-    if (step === 2) {
-        return (
-            <Card className="w-[450px]  bg-neutral-800/70 border-2 border-neutral-300">
-                <CardContent className="h-full p-0 flex flex-col items-center justify-center ">
-                    <div className="w-full max-w-sm space-y-6">
-                        {/* File Info */}
-                        <div className="flex items-center space-x-4">
-                            <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <FileVideo size={24} className="text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-foreground font-medium truncate">
-                                        {selectedFile?.name || 'video-file.mp4'}
-                                    </span>
-                                    <div className="flex items-center space-x-2 ml-2">
-                                        {uploadProgress < 100 ? (
-                                            <Badge variant="outline" className="text-xs">
-                                                {Math.round(uploadProgress)}%
-                                            </Badge>
-                                        ) : (
-                                            <CheckCircle size={16} className="text-green-500" />
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="text-muted-foreground text-xs">
-                                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'} of {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '12.6 MB'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Progress Bar */}
-                        <div className="space-y-2">
-                            <Progress value={uploadProgress} className="h-2" />
-                        </div>
-
-                        {/* Status Text */}
-                        {/* <div className="text-center">
-              {uploadProgress < 100 ? (
-                <p className="text-muted-foreground text-sm">Uploading video...</p>
-              ) : (
-                <div className="flex items-center justify-center space-x-2">
-                  <CheckCircle size={16} className="text-green-500" />
-                  <p className="text-green-500 text-sm font-medium">Upload complete!</p>
-                </div>
-              )}
-            </div> */}
-                    </div>
-                </CardContent>
-            </Card>
-        );
+  const toggleMute = useCallback(() => {
+    if (videoRef.current && !isGenerating) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
     }
+  }, [isMuted, isGenerating]);
 
-    // Step 3: Video Preview
-    if (step === 3) {
-        return (
-            <div className=' relative '>
-                <Card className="bg-black p-0 border-0 overflow-hidden relative group" style={{ aspectRatio: videoAspectRatio, maxWidth: '800px', maxHeight: '600px' }}>
-                    <CardContent className="p-0 h-full relative">
-                        <video
-                            ref={videoRef}
-                            src={videoUrl}
-                            onLoadedMetadata={handleVideoLoad}
-                            onPlay={handleVideoPlay}
-                            onPause={handleVideoPause}
-                            className="w-full h-full object-contain cursor-pointer"
-                            onClick={togglePlay}
-                            muted={isMuted}
-                        >
-                            Your browser does not support the video tag.
-                        </video>
+  const handleVideoPlay = useCallback(() => setIsPlaying(true), []);
+  const handleVideoPause = useCallback(() => setIsPlaying(false), []);
 
-                        {/* Custom Video Controls */}
-                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                            <div className="flex items-center space-x-4 pointer-events-auto ">
-                                {/* Play/Pause Button */}
-                                <Button
-                                    onClick={togglePlay}
-                                    size="icon"
-                                    variant="secondary"
-                                    className="w-12 scale-120 invert h-12 bg-neutral-800 hover:bg-neutral-800 border-0 rounded-full"
-                                >
-                                    {isPlaying ? (
-                                        <Pause size={20} className="text-white" />
-                                    ) : (
-                                        <Play size={20} className="text-white " />
-                                    )}
-                                </Button>
+  // Handle file selection
+  const handleFileSelect = useCallback((file: File) => {
+    setSelectedFile(file);
+    setVideoUrl(URL.createObjectURL(file));
+    setStep(2);
+    simulateUpload();
+  }, []);
 
+  // Handle drag state changes
+  const handleDragStateChange = useCallback((active: boolean) => {
+    setDragActive(active);
+  }, []);
 
-                            </div>
-                        </div>
-                          {/* Loading Overlay */}
-                        {isGenerating && (
-                            <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
-                                <div 
-                                    className="absolute inset-0 opacity-95"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #0a0a0a, #1a1a1a, #2a2a2a, #1a1a1a, #0a0a0a)',
-                                        backgroundSize: '400% 400%',
-                                        animation: 'shimmer 4s ease-in-out infinite'
-                                    }}
-                                />
-                                <style jsx>{`
-                                    @keyframes shimmer {
-                                        0% { background-position: 0% 50%; }
-                                        50% { background-position: 100% 50%; }
-                                        100% { background-position: 0% 50%; }
-                                    }
-                                    @keyframes pulse-glow {
-                                        0%, 100% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.3); }
-                                        50% { box-shadow: 0 0 40px rgba(255, 255, 255, 0.6); }
-                                    }
-                                    @keyframes float {
-                                        0%, 100% { transform: translateY(0px); }
-                                        50% { transform: translateY(-10px); }
-                                    }
-                                `}</style>
-                                
-                                <div className="relative z-10 text-center space-y-6">
-                                    <div className="relative inline-block">
-                                        <div 
-                                            className="w-20 h-20 border-4 border-neutral-600 border-t-white rounded-full animate-spin"
-                                            style={{ animation: 'spin 2s linear infinite, pulse-glow 2s ease-in-out infinite' }}
-                                        />
-                                        <IoSparkles 
-                                            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white w-8 h-8"
-                                            style={{ animation: 'float 3s ease-in-out infinite' }}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <h3 className="text-white text-xl font-bold">Generating Content</h3>
-                                        <p className="text-neutral-300 text-base">Processing your video with AI magic...</p>
-                                     
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+  // Simulate upload progress
+  const simulateUpload = useCallback(() => {
+    setUploadProgress(0);
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => setStep(3), 500);
+          return 100;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+  }, []);
 
-                        {/* Video Controls - Only show when not generating */}
-                        {!isGenerating && (
-                            <>
-                                {/* Clickable Play Area */}
-                                <div 
-                                    className="absolute inset-0 z-10 cursor-pointer"
-                                    onClick={togglePlay}
-                                />
-
-                                {/* Control Buttons */}
-                                <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                                    <Button
-                                        onClick={togglePlay}
-                                        size="icon"
-                                        variant="secondary"
-                                        className="w-16 h-16 bg-black/60 hover:bg-black/80 border-0 rounded-full backdrop-blur-sm shadow-lg pointer-events-auto transition-all duration-200 hover:scale-110"
-                                    >
-                                        {isPlaying ? (
-                                            <Pause size={24} className="text-white" />
-                                        ) : (
-                                            <Play size={24} className="text-white ml-0" />
-                                        )}
-                                    </Button>
-                                </div>
-
-                                {/* Bottom Controls */}
-                                <div className="absolute bottom-0 left-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <div className="flex justify-between items-end">
-                                        {/* <Button
-                                            onClick={toggleMute}
-                                            size="icon"
-                                            variant="secondary"
-                                            className="w-12 h-12 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
-                                        >
-                                            {isMuted ? (
-                                                <VolumeX size={20} className="text-white" />
-                                            ) : (
-                                                <Volume2 size={20} className="text-white" />
-                                            )}
-                                        </Button> */}
-                                        <Badge variant="secondary" className="text-sm bg-black/60 backdrop-blur-sm py-2 px-3 text-white border-white/20 shadow-lg">
-                                            {videoAspectRatio}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {/* Reset Button */}
-                        <Button
-                            onClick={resetUpload}
-                            size="icon"
-                            variant="secondary"
-                            className="absolute top-4 right-4 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-neutral-800 hover:bg-neutral-800 border-0"
-                        >
-                            <X size={16} className="text-white" />
-                        </Button>
-
-                        {/* Video Info Overlay */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <div className="flex justify-between items-end">
-                                {/* <div>
-                <p className="text-white text-sm font-medium truncate">
-                  {selectedFile?.name || 'video-file.mp4'}
-                </p>
-                <p className="text-white/70 text-xs">
-                  {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
-                </p>
-              </div> */}
-                                {/* Mute/Unmute Button */}
-                                <Button
-                                    onClick={toggleMute}
-                                    size="icon"
-                                    variant="secondary"
-                                    className="w-10 h-10 bg-black/50 backdrop-blur-xs hover:bg-neutral-800 border-0 rounded-full"
-                                >
-                                    {isMuted ? (
-                                        <VolumeX size={20} className="text-white" />
-                                    ) : (
-                                        <Volume2 size={20} className="text-white" />
-                                    )}
-                                </Button>
-                                <Badge variant="secondary" className="text-xs bg-black/50 py-2 text-white border-white/20">
-                                    {videoAspectRatio}
-                                </Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <div className=' absolute top-0 left-full ml-4  w-[300px] flex items-center justify-center gap-2 flex-col'>
-                    <div className='w-full bg-neutral-800 p-3 rounded-xl'>
-                        <span className='text-sm text-neutral-200'>info</span>
-                        <div className='grid grid-cols-2 gap-2 mt-2'>
-                            <span className='text-sm text-neutral-400 '>name:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>{selectedFile?.name || 'video-file.mp4'}</p>
-                            <span className='text-sm text-neutral-400 '>size:</span>
-                            <p className='text-sm text-neutral-200 truncate'>
-                                {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
-                            </p>
-                            <span className='text-sm text-neutral-400 '>resolution:</span>
-                            <p className='text-sm text-neutral-200 truncate'>
-                                {videoDimensions.width > 0 ? `${videoDimensions.width}×${videoDimensions.height}` : '1920×1080'}
-                            </p>
-                            <span className='text-sm text-neutral-400 '>duration:</span>
-                            <p className='text-sm text-neutral-200 truncate'>
-                                {videoDuration > 0 ? formatDuration(videoDuration) : '2:34'}
-                            </p>
-                            <span className='text-sm text-neutral-400 '>format:</span>
-                            <p className='text-sm text-neutral-200 truncate'>
-                               {selectedFile ? getFileFormat(selectedFile.name) : 'MP4'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className='w-full bg-neutral-800 p-2 rounded-xl flex flex-col gap-2'>
-                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
-                        <div className='flex flex-col '>
-                            <label htmlFor="transcribe" className='text-sm text-neutral-200'>subtitles</label>
-                            <span className='text-[12px] text-neutral-400'>Add captions automatically</span>
-                            </div>
-                             <Switch id="transcribe" />
-                        </div>
-                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
-                           <div className='flex flex-col '>
-                            <label htmlFor="brolls" className='text-sm text-neutral-200'>B-rolls</label>
-                            <span className='text-[12px] text-neutral-400'>Add supplementary images.</span>
-                            </div>
-                             <Switch id="brolls" />
-
-                        </div>
-                    </div>
-                    <div className='w-full p-2 bg-neutral-800 rounded-xl flex items-center justify-center'>
-                        <Button size={'lg'} className='w-full' >
-                            <IoSparkles />
-                            Generate
-                            </Button>
-                    </div>
-                  
-                </div>
-            </div>
-        );
+  // Handle generate button click
+  const handleGenerate = useCallback(() => {
+    setIsGenerating(true);
+    // Pause video if playing
+    if (isPlaying && videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
     }
+    
+    // Simulate generation process
+    setTimeout(() => {
+      setIsGenerating(false);
+    }, 5000);
+  }, [isPlaying]);
 
-    return null;
+  // Reset to step 1
+  const resetUpload = useCallback(() => {
+    setStep(1);
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setVideoUrl('');
+    setVideoAspectRatio('16/9');
+    setVideoDimensions({ width: 0, height: 0 });
+    setVideoDuration(0);
+    setIsPlaying(false);
+    setIsMuted(false);
+    setIsGenerating(false);
+    setSubtitlesEnabled(false);
+    setBrollsEnabled(false);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  // Render based on current step
+  if (step === 1) {
+    return (
+      <VideoUploadArea
+        dragActive={dragActive}
+        onFileSelect={handleFileSelect}
+        onDragStateChange={handleDragStateChange}
+        fileInputRef={fileInputRef}
+      />
+    );
+  }
+
+  if (step === 2) {
+    return (
+      <VideoUploadProgress
+        selectedFile={selectedFile}
+        uploadProgress={uploadProgress}
+      />
+    );
+  }
+
+  if (step === 3) {
+    return (
+      <div className="relative">
+        <VideoPreview
+          videoUrl={videoUrl}
+          videoAspectRatio={videoAspectRatio}
+          isPlaying={isPlaying}
+          isMuted={isMuted}
+          isGenerating={isGenerating}
+          videoRef={videoRef}
+          onVideoLoad={handleVideoLoad}
+          onVideoPlay={handleVideoPlay}
+          onVideoPause={handleVideoPause}
+          onTogglePlay={togglePlay}
+          onToggleMute={toggleMute}
+          onReset={resetUpload}
+        />
+        
+        <VideoInfo
+          selectedFile={selectedFile}
+          videoDimensions={videoDimensions}
+          videoDuration={videoDuration}
+          videoAspectRatio={videoAspectRatio}
+          subtitlesEnabled={subtitlesEnabled}
+          brollsEnabled={brollsEnabled}
+          onSubtitlesChange={setSubtitlesEnabled}
+          onBrollsChange={setBrollsEnabled}
+          onGenerate={handleGenerate}
+        />
+      </div>
+    );
+  }
+
+  return null;
 }
