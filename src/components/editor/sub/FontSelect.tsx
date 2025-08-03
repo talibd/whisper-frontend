@@ -1,7 +1,7 @@
 // src/components/editor/sub/FontSelect.tsx
 'use client'
 
-import React, { useState, useMemo, useCallback, memo, useEffect } from 'react'
+import React, { useState, useMemo, useCallback, memo, useEffect, useRef } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { FixedSizeList as List } from 'react-window'
 import { useFontManager } from '@/hooks/useFontManager'
@@ -46,9 +46,10 @@ const FontItem = memo(({ index, style, data }: {
     selectedFont: string;
     onSelect: (font: string) => void;
     searchTerm: string;
+    loadedFonts: Set<string>;
   }
 }) => {
-  const { fonts, selectedFont, onSelect, searchTerm } = data;
+  const { fonts, selectedFont, onSelect, searchTerm, loadedFonts } = data;
   const font = fonts[index];
 
   const handleSelect = useCallback(() => {
@@ -62,11 +63,21 @@ const FontItem = memo(({ index, style, data }: {
     return font.replace(regex, '<mark class="bg-transparent text-white">$1</mark>');
   }, [font, searchTerm]);
 
+  // Get font style for the font item
+  const getFontStyle = useCallback(() => {
+    const isLoaded = loadedFonts.has(font);
+    return {
+      fontFamily: isLoaded ? `'${font}', sans-serif` : 'inherit',
+      fontSize: '14px',
+      fontWeight: 400,
+    };
+  }, [font, loadedFonts]);
+
   return (
     <div
       style={style}
       className={cn(
-        "flex items-center px-2 py-1.5 text-sm cursor-pointer rounded-sm  hover:bg-neutral-700",
+        "flex items-center px-2 py-1.5 text-sm cursor-pointer rounded-sm hover:bg-neutral-700",
         selectedFont === font && "bg-neutral-700"
       )}
       onClick={handleSelect}
@@ -74,10 +85,11 @@ const FontItem = memo(({ index, style, data }: {
       <span
         dangerouslySetInnerHTML={{ __html: highlightedFont }}
         className="flex-1"
+        style={getFontStyle()}
       />
       <Check
         className={cn(
-          'ml-auto h-4 w-4',
+          'ml-auto h-4 w-4 flex-shrink-0',
           selectedFont === font ? 'opacity-100' : 'opacity-0'
         )}
       />
@@ -96,6 +108,9 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loadedFonts, setLoadedFonts] = useState<Set<string>>(new Set());
+  const [hasAutoScrolled, setHasAutoScrolled] = useState(false);
+  const listRef = useRef<any>(null);
 
   const { fonts, loading, error, loadFont, retryFetch } = useFontManager();
 
@@ -122,6 +137,70 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
     );
   }, [fonts, debouncedSearchTerm]);
 
+  // Load fonts for visible items when dropdown opens
+  useEffect(() => {
+    if (open && filteredFonts.length > 0) {
+      // Only auto-scroll to selected font on first open, not when searching
+      if (value && listRef.current && !hasAutoScrolled && !searchTerm) {
+        const selectedIndex = filteredFonts.findIndex(font => font === value);
+        if (selectedIndex !== -1) {
+          // Small delay to ensure the list is rendered
+          setTimeout(() => {
+            listRef.current?.scrollToItem(selectedIndex, 'start');
+            setHasAutoScrolled(true);
+          }, 50);
+        }
+      }
+
+      // Load first 20 fonts when dropdown opens for better UX
+      const fontsToLoad = filteredFonts.slice(0, 20);
+      
+      const loadBatchFonts = async () => {
+        for (const font of fontsToLoad) {
+          if (!loadedFonts.has(font)) {
+            try {
+              await loadFont(font);
+              setLoadedFonts(prev => new Set(prev).add(font));
+            } catch (error) {
+              console.warn(`Failed to load font: ${font}`);
+            }
+          }
+        }
+      };
+
+      loadBatchFonts();
+    }
+
+    // Reset auto-scroll flag when dropdown closes
+    if (!open) {
+      setHasAutoScrolled(false);
+    }
+  }, [open, filteredFonts, loadFont, loadedFonts, value, hasAutoScrolled, searchTerm]);
+
+  // Load fonts in background without causing re-renders
+  const loadFontsInBackground = useCallback((startIndex: number, stopIndex: number) => {
+    const fontsToLoad = filteredFonts.slice(startIndex, stopIndex + 1);
+    
+    // Use a timeout to avoid blocking the scroll
+    setTimeout(() => {
+      fontsToLoad.forEach(async (font) => {
+        if (!loadedFonts.has(font)) {
+          try {
+            await loadFont(font);
+            // Use functional update to avoid stale closure
+            setLoadedFonts(prev => {
+              const newSet = new Set(prev);
+              newSet.add(font);
+              return newSet;
+            });
+          } catch (error) {
+            console.warn(`Failed to load font: ${font}`);
+          }
+        }
+      });
+    }, 0);
+  }, [filteredFonts, loadFont, loadedFonts]);
+
   // Memoized font selection handler
   const handleFontSelect = useCallback(async (selectedFont: string) => {
     const newValue = selectedFont === value ? '' : selectedFont;
@@ -142,6 +221,11 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
     // Load font dynamically
     try {
       await loadFont(selectedFont);
+      setLoadedFonts(prev => {
+        const newSet = new Set(prev);
+        newSet.add(selectedFont);
+        return newSet;
+      });
 
       // Update preview if exists
       const preview = document.getElementById('font-preview');
@@ -158,13 +242,14 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
     setSearchTerm(search);
   }, []);
 
-  // Memoized list data
+  // Stable list data that doesn't change on every loadedFonts update
   const listData = useMemo(() => ({
     fonts: filteredFonts,
     selectedFont: value,
     onSelect: handleFontSelect,
-    searchTerm: debouncedSearchTerm
-  }), [filteredFonts, value, handleFontSelect, debouncedSearchTerm]);
+    searchTerm: debouncedSearchTerm,
+    loadedFonts,
+  }), [filteredFonts, value, handleFontSelect, debouncedSearchTerm, loadedFonts]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -175,9 +260,12 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
           aria-expanded={open}
           className="w-full justify-between text-neutral-300 text-sm font-normal"
           disabled={loading}
+          style={{
+            fontFamily: value && loadedFonts.has(value) ? `'${value}', sans-serif` : 'inherit'
+          }}
         >
           {loading ? 'Loading fonts...' : (value || 'Select font')}
-          <ChevronsUpDown className="opacity-50" />
+          <ChevronsUpDown className="opacity-50 ml-2 h-4 w-4 shrink-0" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -186,7 +274,7 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
         sideOffset={20}
         className="-mt-3 w-[200px] p-0"
       >
-        <Command className="bg-neutral-800 ">
+        <Command className="bg-neutral-800">
           <CommandInput
             placeholder="Search font..."
             className="h-9"
@@ -215,12 +303,17 @@ export const FontSelect = memo(({ value: controlledValue, onSelect }: FontSelect
             ) : (
               <div className="pl-1 p-1">
                 <List
-                  width={''}
+                  ref={listRef}
+                  width=""
                   height={Math.min(filteredFonts.length * 32, 280)}
                   itemCount={filteredFonts.length}
                   itemSize={32}
                   itemData={listData}
-                  className="MyScrollbar "
+                  className="MyScrollbar"
+                  onItemsRendered={({ visibleStartIndex, visibleStopIndex }) => {
+                    // Load fonts for visible items without blocking scroll
+                    loadFontsInBackground(visibleStartIndex, visibleStopIndex);
+                  }}
                 >
                   {FontItem}
                 </List>

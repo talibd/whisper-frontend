@@ -66,7 +66,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
                 'group p-3 border rounded-xl cursor-pointer transition-all duration-200'
                 ,
                 seg.isSelected 
-                  ? 'border-blue-400 bg-blue-900/20 shadow-blue-900/20' 
+                  ? 'border-neutral-300 bg-white/10 shadow-blue-900/20' 
                   : 'border-neutral-600 bg-neutral-700/80 hover:border-neutral-500'
               )}
               onClick={() => handleSegmentClick(seg.id)}
