@@ -12,12 +12,12 @@ import HydrationWrapper from "@/components/HydrationWrapper";
 function page() {
   return (
     <HydrationWrapper>
-    <div className="grid grid-cols-9 grid-rows-5 bg-neutral-900 min-h-screen">
+    <div className="grid grid-cols-9 grid-rows-5 bg-neutral-900 min-h-screen overflow-hidden h-screen">
       {/* content side bar  */}
       <div className="col-span-2 row-span-5 bg-neutral-800 border-r border-neutral-700 ">
         <h1 className="text-2xl text-white pt-3 px-4">Layers</h1>
-        <hr className="my-4 border-neutral-700" />
-        <div className="px-3">
+        <hr className="mt-4 border-neutral-700" />
+        <div className="px-3 pt-4  overflow-y-auto h-screen MyScrollbar">
           <SegmentCard />
         </div>
       </div>

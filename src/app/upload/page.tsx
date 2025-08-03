@@ -1,4 +1,4 @@
-import VideoUpload from '@/components/VideoUpload'
+import VideoUpload from '@/components/video/VideoUpload'
 import React from 'react'
 
 function page() {

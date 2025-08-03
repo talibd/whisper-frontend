@@ -1,46 +1,31 @@
 'use client';
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, Play, CheckCircle, Film, X, FileVideo, Pause, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import React, { useState, useRef, useCallback } from 'react';
+import { Upload, Play, CheckCircle, Film, X, FileVideo, Pause, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from './ui/switch';
+import { Switch } from '@/components/ui/switch';
 import { IoSparkles } from "react-icons/io5";
-import { useCurrentProject, useEditorActions } from '@/store/editorStore';
+
 
 export default function VideoUpload() {
-    const currentProject = useCurrentProject();
-    const { createProject, updateProject, addSegment } = useEditorActions();
-
-    const [step, setStep] = useState(() => {
-        // If there's already a project with a video, start at step 3
-        return currentProject?.videoUrl ? 3 : 1;
-    });
-    
+    const [step, setStep] = useState(1);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dragActive, setDragActive] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [videoUrl, setVideoUrl] = useState(currentProject?.videoUrl || '');
+    const [videoUrl, setVideoUrl] = useState('');
     const [videoAspectRatio, setVideoAspectRatio] = useState('16/9');
-    const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
-    const [videoDuration, setVideoDuration] = useState(currentProject?.duration || 0);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
-    const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
-    const [brollsEnabled, setBrollsEnabled] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+     const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
+    const [videoDuration, setVideoDuration] = useState(0);
 
-    // Update local state when project changes
-    useEffect(() => {
-        if (currentProject?.videoUrl) {
-            setVideoUrl(currentProject.videoUrl);
-            setVideoDuration(currentProject.duration || 0);
-            setStep(3);
-        }
-    }, [currentProject]);
+     const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+    const [brollsEnabled, setBrollsEnabled] = useState(false);
 
     // Determine aspect ratio based on video dimensions
     const getAspectRatio = (width: number, height: number): string => {
@@ -63,7 +48,8 @@ export default function VideoUpload() {
         return '9/16';                    // Tall videos
     };
 
-    // Format duration to MM:SS
+
+      // Format duration to MM:SS
     const formatDuration = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -81,30 +67,8 @@ export default function VideoUpload() {
         const video = e.currentTarget;
         const aspectRatio = getAspectRatio(video.videoWidth, video.videoHeight);
         setVideoAspectRatio(aspectRatio);
-        setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
+         setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
         setVideoDuration(video.duration);
-
-        // Update project with video metadata
-        if (currentProject) {
-            updateProject({
-                duration: video.duration,
-                thumbnail: generateThumbnail(video), // You can implement this
-            });
-        }
-    };
-
-    // Generate thumbnail from video (optional implementation)
-    const generateThumbnail = (video: HTMLVideoElement): string => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        
-        if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            return canvas.toDataURL('image/jpeg', 0.8);
-        }
-        return '';
     };
 
     // Video control functions
@@ -128,7 +92,6 @@ export default function VideoUpload() {
 
     const handleVideoPlay = () => setIsPlaying(true);
     const handleVideoPause = () => setIsPlaying(false);
-
     const handleDrag = useCallback((e: React.DragEvent<HTMLInputElement>) => {
         e.preventDefault();
         e.stopPropagation();
@@ -155,20 +118,7 @@ export default function VideoUpload() {
     const handleFile = (file: File) => {
         if (file?.type.startsWith('video/')) {
             setSelectedFile(file);
-            const objectUrl = URL.createObjectURL(file);
-            setVideoUrl(objectUrl);
-            
-            // Create or update project with video
-            if (!currentProject) {
-                createProject(`Video Project - ${file.name.split('.')[0]}`);
-            }
-            
-            // Update project with video URL and file info
-            updateProject({
-                videoUrl: objectUrl,
-                name: currentProject?.name || `Video Project - ${file.name.split('.')[0]}`,
-            });
-
+            setVideoUrl(URL.createObjectURL(file));
             setStep(2);
             simulateUpload();
         } else {
@@ -197,105 +147,38 @@ export default function VideoUpload() {
         if (file) handleFile(file);
     };
 
-    // Handle generate button click
+      // Handle generate button click
     const handleGenerate = () => {
         setIsGenerating(true);
-        
-        // Simulate content generation and add demo segments
+        // Simulate generation process
         setTimeout(() => {
-            if (subtitlesEnabled) {
-                // Add demo subtitle segments
-                addSegment({
-                    type: 'subtitle',
-                    startTime: '00:00',
-                    endTime: '00:05',
-                    content: 'Welcome to our video content. This is the opening segment that introduces the main topic.',
-                    highlightedKeyword: 'Welcome',
-                    isSelected: false,
-                });
-
-                addSegment({
-                    type: 'subtitle',
-                    startTime: '00:05',
-                    endTime: '00:10',
-                    content: 'Here we dive deeper into the subject matter and explore key concepts.',
-                    highlightedKeyword: 'concepts',
-                    isSelected: false,
-                });
-            }
-
-            if (brollsEnabled) {
-                // Add demo B-roll segments
-                addSegment({
-                    type: 'broll',
-                    startTime: '00:10',
-                    endTime: '00:15',
-                    content: 'Technology',
-                    imageUrl: '/demo.jpeg',
-                    isSelected: false,
-                });
-
-                addSegment({
-                    type: 'broll',
-                    startTime: '00:15',
-                    endTime: '00:20',
-                    content: 'Innovation',
-                    imageUrl: '/demo.jpeg',
-                    isSelected: false,
-                });
-            }
-
             setIsGenerating(false);
         }, 5000);
     };
 
-    // Reset to step 1 and clear project
+    // Reset to step 1
     const resetUpload = () => {
-        // Clean up object URL to prevent memory leaks
-        if (videoUrl && videoUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(videoUrl);
-        }
-
         setStep(1);
         setSelectedFile(null);
         setUploadProgress(0);
         setVideoUrl('');
         setVideoAspectRatio('16/9');
-        setVideoDimensions({ width: 0, height: 0 });
+         setVideoDimensions({ width: 0, height: 0 });
         setVideoDuration(0);
         setIsPlaying(false);
         setIsMuted(false);
-        setIsGenerating(false);
-        setSubtitlesEnabled(true);
-        setBrollsEnabled(true);
-        
+         setIsGenerating(false);
+        setSubtitlesEnabled(false);
+        setBrollsEnabled(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-
-        // Clear project data
-        if (currentProject) {
-            updateProject({
-                videoUrl: undefined,
-                duration: undefined,
-                thumbnail: undefined,
-            });
-        }
     };
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            if (videoUrl && videoUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(videoUrl);
-            }
-        };
-    }, [videoUrl]);
 
     // Step 1: Upload Area
     if (step === 1) {
         return (
-            <Card className="w-[500px] h-[300px] bg-gradient-to-br from-neutral-800/80 via-neutral-800/70 to-neutral-900/80 border-2 border-dashed border-neutral-300 hover:border-neutral-200 transition-all duration-300 hover:shadow-lg hover:shadow-neutral-900/20">
+            <Card className="w-[500px] h-[300px] bg-neutral-800/70 border-2 border-dashed border-neutral-300 hover:border-neutral-200 transition-colors">
                 <CardContent className="h-full flex flex-col items-center justify-center p-8 relative">
                     <input
                         ref={fileInputRef}
@@ -309,30 +192,28 @@ export default function VideoUpload() {
                         onDrop={handleDrop}
                     />
 
-                    <div className={`flex flex-col items-center justify-center transition-all duration-300 ${
-                        dragActive ? 'scale-105 text-blue-400' : 'text-muted-foreground'
-                    }`}>
-                        <div className={`p-6 rounded-full mb-6 transition-all duration-300 ${
-                            dragActive ? 'bg-blue-500/20 border-2 border-blue-400/50' : 'bg-muted/50 border-2 border-transparent'
+                    <div className={`flex flex-col items-center justify-center transition-all duration-200 ${dragActive ? 'scale-105 text-primary' : 'text-muted-foreground'
                         }`}>
-                            <Upload size={40} className={`transition-transform duration-300 ${dragActive ? 'scale-110' : ''}`} />
+                        <div className={`p-4 rounded-full mb-4 transition-colors duration-200 ${dragActive ? 'bg-primary/20' : 'bg-muted/50'
+                            }`}>
+                            <Upload size={32} />
                         </div>
 
-                        <h3 className="text-xl font-bold mb-3 text-foreground transition-colors duration-300">
+                        <h3 className="text-lg font-semibold mb-2 text-foreground">
                             {dragActive ? 'Drop your video here' : 'Upload Video'}
                         </h3>
 
-                        <p className="text-sm text-muted-foreground text-center mb-6 max-w-xs leading-relaxed">
-                            Drag and drop your video file here or click to browse from your device
+                        <p className="text-sm text-muted-foreground text-center mb-4">
+                            Drag and drop your video file here or click to browse
                         </p>
 
-                        <Badge variant="secondary" className="text-xs px-3 py-1 bg-neutral-700/50 border-neutral-600">
-                            MP4, AVI, MOV, WMV supported
+                        <Badge variant="secondary" className="text-xs">
+                            Supported formats: MP4, AVI, MOV, WMV
                         </Badge>
                     </div>
 
                     {dragActive && (
-                        <div className="absolute inset-0 bg-blue-500/10 rounded-lg border-2 border-blue-400 border-dashed animate-pulse" />
+                        <div className="absolute inset-0 bg-primary/10 rounded-lg border-2 border-primary border-dashed" />
                     )}
                 </CardContent>
             </Card>
@@ -342,46 +223,51 @@ export default function VideoUpload() {
     // Step 2: Upload Progress
     if (step === 2) {
         return (
-            <Card className="w-[500px] bg-gradient-to-br from-neutral-800/80 via-neutral-800/70 to-neutral-900/80 border border-neutral-700 shadow-xl">
-                <CardContent className="p-8">
-                    <div className="space-y-6">
+            <Card className="w-[450px]  bg-neutral-800/70 border-2 border-neutral-300">
+                <CardContent className="h-full p-0 flex flex-col items-center justify-center ">
+                    <div className="w-full max-w-sm space-y-6">
                         {/* File Info */}
                         <div className="flex items-center space-x-4">
-                            <div className="w-14 h-14 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                            <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center flex-shrink-0">
                                 <FileVideo size={24} className="text-white" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-foreground font-semibold truncate text-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-foreground font-medium truncate">
                                         {selectedFile?.name || 'video-file.mp4'}
                                     </span>
-                                    <div className="flex items-center space-x-2 ml-4">
+                                    <div className="flex items-center space-x-2 ml-2">
                                         {uploadProgress < 100 ? (
-                                            <Badge variant="outline" className="text-sm px-2 py-1 border-blue-400/50 text-blue-400">
+                                            <Badge variant="outline" className="text-xs">
                                                 {Math.round(uploadProgress)}%
                                             </Badge>
                                         ) : (
-                                            <div className="flex items-center space-x-1">
-                                                <CheckCircle size={18} className="text-white" />
-                                                <span className="text-white text-sm font-medium">Complete</span>
-                                            </div>
+                                            <CheckCircle size={16} className="text-green-500" />
                                         )}
                                     </div>
                                 </div>
-                                <div className="text-muted-foreground text-sm">
-                                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'} uploaded
+                                <div className="text-muted-foreground text-xs">
+                                    {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'} of {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '12.6 MB'}
                                 </div>
                             </div>
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="space-y-3">
-                            <Progress value={uploadProgress} className="h-3 bg-neutral-700" />
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Uploading...</span>
-                                <span>{uploadProgress < 100 ? 'Processing' : 'Ready'}</span>
-                            </div>
+                        <div className="space-y-2">
+                            <Progress value={uploadProgress} className="h-2" />
                         </div>
+
+                        {/* Status Text */}
+                        {/* <div className="text-center">
+              {uploadProgress < 100 ? (
+                <p className="text-muted-foreground text-sm">Uploading video...</p>
+              ) : (
+                <div className="flex items-center justify-center space-x-2">
+                  <CheckCircle size={16} className="text-green-500" />
+                  <p className="text-green-500 text-sm font-medium">Upload complete!</p>
+                </div>
+              )}
+            </div> */}
                     </div>
                 </CardContent>
             </Card>
@@ -391,23 +277,43 @@ export default function VideoUpload() {
     // Step 3: Video Preview
     if (step === 3) {
         return (
-            <div className='relative'>
-                <Card className="bg-black p-0 border border-neutral-700 overflow-hidden relative group shadow-2xl" style={{ aspectRatio: videoAspectRatio, maxWidth: '800px', maxHeight: '600px' }}>
+            <div className=' relative '>
+                <Card className="bg-black p-0 border-0 overflow-hidden relative group" style={{ aspectRatio: videoAspectRatio, maxWidth: '800px', maxHeight: '600px' }}>
                     <CardContent className="p-0 h-full relative">
-                        {/* Video Element - Always Present */}
                         <video
                             ref={videoRef}
                             src={videoUrl}
                             onLoadedMetadata={handleVideoLoad}
                             onPlay={handleVideoPlay}
                             onPause={handleVideoPause}
-                            className="w-full h-full object-contain"
+                            className="w-full h-full object-contain cursor-pointer"
+                            onClick={togglePlay}
                             muted={isMuted}
                         >
                             Your browser does not support the video tag.
                         </video>
 
-                        {/* Loading Overlay */}
+                        {/* Custom Video Controls */}
+                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                            <div className="flex items-center space-x-4 pointer-events-auto ">
+                                {/* Play/Pause Button */}
+                                <Button
+                                    onClick={togglePlay}
+                                    size="icon"
+                                    variant="secondary"
+                                    className="w-12 scale-120 invert h-12 bg-neutral-800 hover:bg-neutral-800 border-0 rounded-full"
+                                >
+                                    {isPlaying ? (
+                                        <Pause size={20} className="text-white" />
+                                    ) : (
+                                        <Play size={20} className="text-white " />
+                                    )}
+                                </Button>
+
+
+                            </div>
+                        </div>
+                          {/* Loading Overlay */}
                         {isGenerating && (
                             <div className="absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
                                 <div 
@@ -482,6 +388,18 @@ export default function VideoUpload() {
                                 {/* Bottom Controls */}
                                 <div className="absolute bottom-0 left-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <div className="flex justify-between items-end">
+                                        {/* <Button
+                                            onClick={toggleMute}
+                                            size="icon"
+                                            variant="secondary"
+                                            className="w-12 h-12 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
+                                        >
+                                            {isMuted ? (
+                                                <VolumeX size={20} className="text-white" />
+                                            ) : (
+                                                <Volume2 size={20} className="text-white" />
+                                            )}
+                                        </Button> */}
                                         <Badge variant="secondary" className="text-sm bg-black/60 backdrop-blur-sm py-2 px-3 text-white border-white/20 shadow-lg">
                                             {videoAspectRatio}
                                         </Badge>
@@ -495,105 +413,91 @@ export default function VideoUpload() {
                             onClick={resetUpload}
                             size="icon"
                             variant="secondary"
-                            className="absolute top-4 right-4 w-10 h-10 opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/60 hover:bg-black/80 backdrop-blur-sm border-0 shadow-lg hover:scale-105 z-30"
+                            className="absolute top-4 right-4 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-neutral-800 hover:bg-neutral-800 border-0"
                         >
-                            <X size={18} className="text-white" />
+                            <X size={16} className="text-white" />
                         </Button>
+
+                        {/* Video Info Overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div className="flex justify-between items-end">
+                                {/* <div>
+                <p className="text-white text-sm font-medium truncate">
+                  {selectedFile?.name || 'video-file.mp4'}
+                </p>
+                <p className="text-white/70 text-xs">
+                  {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
+                </p>
+              </div> */}
+                                {/* Mute/Unmute Button */}
+                                <Button
+                                    onClick={toggleMute}
+                                    size="icon"
+                                    variant="secondary"
+                                    className="w-10 h-10 bg-black/50 backdrop-blur-xs hover:bg-neutral-800 border-0 rounded-full"
+                                >
+                                    {isMuted ? (
+                                        <VolumeX size={20} className="text-white" />
+                                    ) : (
+                                        <Volume2 size={20} className="text-white" />
+                                    )}
+                                </Button>
+                                <Badge variant="secondary" className="text-xs bg-black/50 py-2 text-white border-white/20">
+                                    {videoAspectRatio}
+                                </Badge>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
-
-                {/* Side Panel */}
-                <div className='absolute top-0 left-full ml-6 w-[320px] flex flex-col gap-4'>
-                    {/* Video Info Panel */}
-                    <div className='w-full bg-gradient-to-br from-neutral-800/90 to-neutral-900/90 p-4 rounded-xl border border-neutral-700 shadow-lg backdrop-blur-sm'>
-                        <h3 className='text-base font-semibold text-neutral-100 mb-4 flex items-center gap-2'>
-                            <Film size={18} />
-                            Video Info
-                        </h3>
-                        <div className='grid grid-cols-2 gap-3 text-sm'>
-                          
-                            
-                            <span className='text-neutral-400 font-medium'>Name:</span>
-                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-neutral-200 truncate font-mono text-xs'>
-                                {selectedFile?.name || 'video-file.mp4'}
-                            </p>
-                            
-                            <span className='text-neutral-400 font-medium'>Size:</span>
-                            <p className='text-neutral-200 font-mono text-xs'>
+                <div className=' absolute top-0 left-full ml-4  w-[300px] flex items-center justify-center gap-2 flex-col'>
+                    <div className='w-full bg-neutral-800 p-3 rounded-xl'>
+                        <span className='text-sm text-neutral-200'>info</span>
+                        <div className='grid grid-cols-2 gap-2 mt-2'>
+                            <span className='text-sm text-neutral-400 '>name:</span>
+                            <p title={selectedFile?.name || 'video-file.mp4'} className='text-sm text-neutral-200 truncate'>{selectedFile?.name || 'video-file.mp4'}</p>
+                            <span className='text-sm text-neutral-400 '>size:</span>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB` : '3.2 MB'}
                             </p>
-                            
-                            <span className='text-neutral-400 font-medium'>Resolution:</span>
-                            <p className='text-neutral-200 font-mono text-xs'>
+                            <span className='text-sm text-neutral-400 '>resolution:</span>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {videoDimensions.width > 0 ? `${videoDimensions.width}×${videoDimensions.height}` : '1920×1080'}
                             </p>
-                            
-                            <span className='text-neutral-400 font-medium'>Duration:</span>
-                            <p className='text-neutral-200 font-mono text-xs'>
+                            <span className='text-sm text-neutral-400 '>duration:</span>
+                            <p className='text-sm text-neutral-200 truncate'>
                                 {videoDuration > 0 ? formatDuration(videoDuration) : '2:34'}
                             </p>
-                            
-                            <span className='text-neutral-400 font-medium'>Format:</span>
-                            <p className='text-neutral-200 font-mono text-xs'>
-                                {selectedFile ? getFileFormat(selectedFile.name) : 'MP4'}
+                            <span className='text-sm text-neutral-400 '>format:</span>
+                            <p className='text-sm text-neutral-200 truncate'>
+                               {selectedFile ? getFileFormat(selectedFile.name) : 'MP4'}
                             </p>
-
-                        
                         </div>
                     </div>
 
-                    {/* Options Panel */}
-                    <div className='w-full bg-gradient-to-br from-neutral-800/90 to-neutral-900/90 p-4 rounded-xl border border-neutral-700 shadow-lg backdrop-blur-sm'>
-                        <h3 className='text-base font-semibold text-neutral-100 mb-4'>Enhancement Options</h3>
-                        <div className='flex flex-col gap-3'>
-                            <div className='flex items-center justify-between p-4 bg-neutral-700/50 rounded-lg border border-neutral-600/50 transition-all duration-200 hover:bg-neutral-600/50'>
-                                <div className='flex flex-col'>
-                                    <label htmlFor="transcribe" className='text-sm font-medium text-neutral-200'>Auto Subtitles</label>
-                                    <span className='text-xs text-neutral-400'>Generate captions automatically</span>
-                                </div>
-                                <Switch 
-                                    id="transcribe" 
-                                    checked={subtitlesEnabled}
-                                    onCheckedChange={setSubtitlesEnabled}
-                                    disabled={isGenerating}
-                                />
+                    <div className='w-full bg-neutral-800 p-2 rounded-xl flex flex-col gap-2'>
+                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
+                        <div className='flex flex-col '>
+                            <label htmlFor="transcribe" className='text-sm text-neutral-200'>subtitles</label>
+                            <span className='text-[12px] text-neutral-400'>Add captions automatically</span>
                             </div>
-                            <div className='flex items-center justify-between p-4 bg-neutral-700/50 rounded-lg border border-neutral-600/50 transition-all duration-200 hover:bg-neutral-600/50'>
-                                <div className='flex flex-col'>
-                                    <label htmlFor="brolls" className='text-sm font-medium text-neutral-200'>B-roll images</label>
-                                    <span className='text-xs text-neutral-400'>Add supplementary images.</span>
-                                </div>
-                                <Switch 
-                                    id="brolls" 
-                                    checked={brollsEnabled}
-                                    onCheckedChange={setBrollsEnabled}
-                                    disabled={isGenerating}
-                                />
+                             <Switch id="transcribe" />
+                        </div>
+                        <div className='flex items-center justify-between p-3 bg-neutral-700/70 rounded-lg'>
+                           <div className='flex flex-col '>
+                            <label htmlFor="brolls" className='text-sm text-neutral-200'>B-rolls</label>
+                            <span className='text-[12px] text-neutral-400'>Add supplementary images.</span>
                             </div>
+                             <Switch id="brolls" />
+
                         </div>
                     </div>
-
-                    {/* Generate Button */}
-                    <div className='w-full p-4 bg-gradient-to-br from-neutral-800/90 to-neutral-900/90 rounded-xl border border-neutral-700 shadow-lg backdrop-blur-sm'>
-                        <Button 
-                            size={'lg'} 
-                            className='w-full h-12 bg-gradient-to-r from-neutral-100 to-neutral-200 hover:from-neutral-100 hover:to-neutral-200 border-0 shadow-lg transition-all duration-200  ' 
-                            onClick={handleGenerate}
-                            disabled={isGenerating}
-                        >
-                            {isGenerating ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                                    Generating...
-                                </>
-                            ) : (
-                                <>
-                                    <IoSparkles className="w-5 h-5 mr-1" />
-                                    Generate Enhanced Video
-                                </>
-                            )}
-                        </Button>
+                    <div className='w-full p-2 bg-neutral-800 rounded-xl flex items-center justify-center'>
+                        <Button size={'lg'} className='w-full' >
+                            <IoSparkles />
+                            Generate
+                            </Button>
                     </div>
+                  
                 </div>
             </div>
         );

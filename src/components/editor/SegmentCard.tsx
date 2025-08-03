@@ -56,7 +56,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 ">
       {segments.map((seg) => (
         <div key={seg.id}>
           {seg.type === 'subtitle' ? (
