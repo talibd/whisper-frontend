@@ -67,6 +67,34 @@ export interface EditorSettings {
   snapToGrid: boolean;
 }
 
+// Backend data interfaces
+export interface Word {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface Segment {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface BrollImages {
+  [keyword: string]: string | null;
+}
+
+export interface ProjectMetadata {
+  originalFile?: string;
+  transcript?: string;
+  words?: Word[];
+  segments?: Segment[];
+  keywords?: string[];
+  brollImages?: BrollImages;
+  subtitlesEnabled?: boolean;
+  brollsEnabled?: boolean;
+}
+
 export interface ProjectData {
   id: string;
   name: string;
@@ -78,6 +106,7 @@ export interface ProjectData {
   segments: SegmentData[];
   globalStyle: StyleSettings;
   settings: EditorSettings;
+  metadata?: ProjectMetadata; // Store backend data for re-export
 }
 
 export const processSegmentsWithWordCount = (segments: SegmentData[], wordCount: number): SegmentData[] => {
@@ -159,6 +188,7 @@ export interface EditorState {
     startExport: () => void;
     updateExportProgress: (progress: number) => void;
     finishExport: () => void;
+    exportVideoWithBackend: () => Promise<string | null>; // New backend export function
     
     // Suggestions
     addSuggestion: (suggestion: string) => void;
@@ -446,6 +476,67 @@ export const useEditorStore = create<EditorState>()(
           }, 2000);
         },
 
+        // New backend export function
+        exportVideoWithBackend: async () => {
+          const state = get();
+          const project = state.currentProject;
+          
+          if (!project || !project.metadata) {
+            console.error('No project or backend data available for export');
+            return null;
+          }
+
+          try {
+            const baseUrl = "https://aivideo-production-2603.up.railway.app";
+            
+            // Start export process
+            state.actions.startExport();
+            
+            const formData = new FormData();
+            
+            // Add original file if available (would need to be stored differently in real app)
+            if (project.metadata.originalFile) {
+              // In a real app, you'd need to handle file storage differently
+              // formData.append("file", originalFile);
+            }
+            
+            formData.append("transcript", project.metadata.transcript || '');
+            formData.append("words", JSON.stringify(project.metadata.words || []));
+            formData.append("keywords", JSON.stringify(project.metadata.keywords || []));
+            formData.append("broll_images", JSON.stringify(project.metadata.brollImages || {}));
+            formData.append("words_per_subtitle", state.editorSettings.wordCount.toString());
+            
+            // Add style settings
+            formData.append("font_family", state.currentStyle.fontFamily);
+            formData.append("font_size", state.currentStyle.fontSize);
+            formData.append("font_weight", state.currentStyle.fontWeight);
+            formData.append("font_color", JSON.stringify(state.currentStyle.color));
+
+            const response = await fetch(`${baseUrl}/generate-video`, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error('Export failed');
+            }
+
+            const result = await response.json();
+            const videoUrl = `${baseUrl}/download-video/${result.video_filename}`;
+            
+            state.actions.finishExport();
+            return videoUrl;
+            
+          } catch (error) {
+            console.error('Export failed:', error);
+            set((state) => {
+              state.isExporting = false;
+              state.exportProgress = 0;
+            });
+            return null;
+          }
+        },
+
         // Suggestions
         addSuggestion: (suggestion: string) => {
           set((state) => {
@@ -531,10 +622,10 @@ export const useSelectedSegment = () => useEditorStore(state => {
 });
 export const useCurrentStyle = () => useEditorStore(state => state.currentStyle);
 export const useEditorSettings = () => useEditorStore(state => state.editorSettings);
-export const useExportState = () => useEditorStore((state) => ({
-  isExporting: state.isExporting,
-  progress: state.exportProgress
-}));
+
+// Fixed export state selectors to prevent object recreation
+export const useIsExporting = () => useEditorStore(state => state.isExporting);
+export const useExportProgress = () => useEditorStore(state => state.exportProgress);
 
 // Stable action selectors to prevent infinite loops
 export const useEditorActions = () => useEditorStore(state => state.actions);
@@ -543,7 +634,25 @@ export const useEditorActions = () => useEditorStore(state => state.actions);
 export const useStartExport = () => useEditorStore(state => state.actions.startExport);
 export const useUpdateExportProgress = () => useEditorStore(state => state.actions.updateExportProgress);
 export const useFinishExport = () => useEditorStore(state => state.actions.finishExport);
+export const useExportVideo = () => useEditorStore(state => state.actions.exportVideoWithBackend);
 
-// New selectors for word count functionality
-export const useProcessedSegments = () => useEditorStore(state => state.actions.getProcessedSegments());
-export const useEstimatedSegmentCount = () => useEditorStore(state => state.actions.getEstimatedSegmentCount());
+// New selectors for word count functionality - using useCallback to prevent recreation
+export const useProcessedSegments = () => {
+  return useEditorStore((state) => {
+    if (!state.currentProject?.segments) return [];
+    return processSegmentsWithWordCount(state.currentProject.segments, state.editorSettings.wordCount);
+  });
+};
+
+export const useEstimatedSegmentCount = () => {
+  return useEditorStore((state) => {
+    if (!state.currentProject?.segments) return 0;
+    return state.currentProject.segments.reduce((total, segment) => {
+      if (segment.type === 'subtitle') {
+        const words = segment.content.split(' ').filter(word => word.trim().length > 0).length;
+        return total + Math.ceil(words / state.editorSettings.wordCount);
+      }
+      return total + 1;
+    }, 0);
+  });
+};

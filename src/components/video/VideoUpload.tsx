@@ -5,6 +5,25 @@ import { VideoUploadArea } from './VideoUploadArea';
 import { VideoUploadProgress } from './VideoUploadProgress';
 import { VideoPreview } from './VideoPreview';
 import { VideoInfo } from './VideoInfo';
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
+import { useEditorActions } from '@/store/editorStore';
+
+interface Word {
+  text: string;
+  start: number;
+  end: number;
+}
+
+interface Segment {
+  text: string;
+  start: number;
+  end: number;
+}
+
+interface BrollImages {
+  [keyword: string]: string | null;
+}
 
 export default function VideoUpload() {
   const [step, setStep] = useState(1);
@@ -18,31 +37,43 @@ export default function VideoUpload() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
   const [videoDuration, setVideoDuration] = useState(0);
-  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
-  const [brollsEnabled, setBrollsEnabled] = useState(false);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+  const [brollsEnabled, setBrollsEnabled] = useState(true);
   
+  // Backend data
+  const [transcript, setTranscript] = useState('');
+  const [words, setWords] = useState<Word[]>([]);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [brollImages, setBrollImages] = useState<BrollImages>({});
+  const [error, setError] = useState<string | null>(null);
+  const [currentProcessStep, setCurrentProcessStep] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const router = useRouter();
+  const { createProject, updateProject } = useEditorActions();
+
+  const baseUrl = "https://aivideo-production-2603.up.railway.app";
+  // const baseUrl = "http://localhost:8080";
 
   // Determine aspect ratio based on video dimensions
   const getAspectRatio = (width: number, height: number): string => {
     const ratio = width / height;
 
-    // Common aspect ratios with tolerance
-    if (Math.abs(ratio - 16 / 9) < 0.1) return '16/9';      // 1.78 - Widescreen
-    if (Math.abs(ratio - 9 / 16) < 0.1) return '9/16';     // 0.56 - Vertical/Stories
-    if (Math.abs(ratio - 1) < 0.1) return '1/1';           // 1.0 - Square
-    if (Math.abs(ratio - 4 / 3) < 0.1) return '4/3';       // 1.33 - Traditional TV
-    if (Math.abs(ratio - 3 / 4) < 0.1) return '3/4';       // 0.75 - Portrait
-    if (Math.abs(ratio - 21 / 9) < 0.1) return '21/9';     // 2.33 - Ultra-wide
-    if (Math.abs(ratio - 2 / 1) < 0.1) return '2/1';       // 2.0 - Cinema
-    if (Math.abs(ratio - 3 / 2) < 0.1) return '3/2';       // 1.5 - Photo standard
-    if (Math.abs(ratio - 2 / 3) < 0.1) return '2/3';       // 0.67 - Portrait photo
+    if (Math.abs(ratio - 16 / 9) < 0.1) return '16/9';
+    if (Math.abs(ratio - 9 / 16) < 0.1) return '9/16';
+    if (Math.abs(ratio - 1) < 0.1) return '1/1';
+    if (Math.abs(ratio - 4 / 3) < 0.1) return '4/3';
+    if (Math.abs(ratio - 3 / 4) < 0.1) return '3/4';
+    if (Math.abs(ratio - 21 / 9) < 0.1) return '21/9';
+    if (Math.abs(ratio - 2 / 1) < 0.1) return '2/1';
+    if (Math.abs(ratio - 3 / 2) < 0.1) return '3/2';
+    if (Math.abs(ratio - 2 / 3) < 0.1) return '2/3';
 
-    // Fallback to closest common ratio
-    if (ratio > 1.5) return '16/9';   // Wide videos
-    if (ratio > 0.8) return '4/3';    // Square-ish videos
-    return '9/16';                    // Tall videos
+    if (ratio > 1.5) return '16/9';
+    if (ratio > 0.8) return '4/3';
+    return '9/16';
   };
 
   // Handle video metadata loading
@@ -81,7 +112,7 @@ export default function VideoUpload() {
     setSelectedFile(file);
     setVideoUrl(URL.createObjectURL(file));
     setStep(2);
-    simulateUpload();
+    processVideo(file);
   }, []);
 
   // Handle drag state changes
@@ -89,35 +120,180 @@ export default function VideoUpload() {
     setDragActive(active);
   }, []);
 
-  // Simulate upload progress
-  const simulateUpload = useCallback(() => {
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => setStep(3), 500);
-          return 100;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-  }, []);
+  // Process video with backend
+  const processVideo = async (file: File) => {
+    try {
+      setError(null);
+      setUploadProgress(0);
+      setCurrentProcessStep('Uploading and transcribing...');
 
-  // Handle generate button click
-  const handleGenerate = useCallback(() => {
-    setIsGenerating(true);
-    // Pause video if playing
-    if (isPlaying && videoRef.current) {
-      videoRef.current.pause();
-      setIsPlaying(false);
+      // Step 1: Transcribe
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const transcribeResponse = await axios.post(`${baseUrl}/transcribe`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 300000,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(Math.min(progress, 25));
+          }
+        },
+      });
+
+      setTranscript(transcribeResponse.data.text);
+      setWords(transcribeResponse.data.words || []);
+      setSegments(transcribeResponse.data.segments || []);
+      setUploadProgress(30);
+
+      if (!subtitlesEnabled && !brollsEnabled) {
+        setUploadProgress(100);
+        setTimeout(() => setStep(3), 500);
+        return;
+      }
+
+      if (subtitlesEnabled && brollsEnabled) {
+        // Step 2: Extract keywords
+        setCurrentProcessStep('Extracting keywords...');
+        const keywordsResponse = await axios.post(`${baseUrl}/extract-keywords`, {
+          transcript: transcribeResponse.data.text,
+        });
+
+        setKeywords(keywordsResponse.data.keywords);
+        setUploadProgress(60);
+
+        // Step 3: Fetch B-roll images
+        setCurrentProcessStep('Fetching B-roll images...');
+        const brollResponse = await axios.post(`${baseUrl}/broll-images`, {
+          keywords: keywordsResponse.data.keywords,
+        });
+
+        setBrollImages(brollResponse.data.images);
+        setUploadProgress(90);
+      } else if (brollsEnabled) {
+        // Only B-roll, still need keywords
+        setCurrentProcessStep('Extracting keywords for B-roll...');
+        const keywordsResponse = await axios.post(`${baseUrl}/extract-keywords`, {
+          transcript: transcribeResponse.data.text,
+        });
+
+        setKeywords(keywordsResponse.data.keywords);
+        setUploadProgress(70);
+
+        setCurrentProcessStep('Fetching B-roll images...');
+        const brollResponse = await axios.post(`${baseUrl}/broll-images`, {
+          keywords: keywordsResponse.data.keywords,
+        });
+
+        setBrollImages(brollResponse.data.images);
+        setUploadProgress(90);
+      }
+
+      setUploadProgress(100);
+      setCurrentProcessStep('Processing complete!');
+      setTimeout(() => setStep(3), 500);
+
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.details || err.message || "Processing failed";
+      setError(`Processing failed: ${errorMsg}`);
+      console.error("Processing error:", err);
+      setUploadProgress(0);
     }
-    
-    // Simulate generation process
-    setTimeout(() => {
-      setIsGenerating(false);
-    }, 5000);
-  }, [isPlaying]);
+  };
+
+  // Convert to editor format
+  const convertToEditorFormat = () => {
+    const editorSegments = [];
+
+    // Add subtitle segments
+    if (subtitlesEnabled && segments.length > 0) {
+      segments.forEach((segment, index) => {
+        // Find highlighted keywords in this segment
+        const segmentKeywords = keywords.filter(keyword => 
+          segment.text.toLowerCase().includes(keyword.toLowerCase())
+        );
+        
+        const highlightedKeyword = segmentKeywords.length > 0 ? segmentKeywords[0] : undefined;
+
+        editorSegments.push({
+          type: 'subtitle' as const,
+          startTime: formatTime(segment.start),
+          endTime: formatTime(segment.end),
+          content: segment.text,
+          highlightedKeyword,
+          isSelected: false
+        });
+      });
+    }
+
+    // Add B-roll segments based on keywords
+    if (brollsEnabled && keywords.length > 0) {
+      keywords.forEach((keyword, index) => {
+        const imageUrl = brollImages[keyword];
+        if (imageUrl) {
+          // Find when this keyword appears in segments to determine timing
+          const segmentWithKeyword = segments.find(seg => 
+            seg.text.toLowerCase().includes(keyword.toLowerCase())
+          );
+
+          if (segmentWithKeyword) {
+            editorSegments.push({
+              type: 'broll' as const,
+              startTime: formatTime(segmentWithKeyword.start),
+              endTime: formatTime(segmentWithKeyword.end),
+              content: keyword,
+              imageUrl,
+              isSelected: false
+            });
+          }
+        }
+      });
+    }
+
+    return editorSegments;
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle generate button click - redirect to editor
+  const handleGenerate = useCallback(async () => {
+    try {
+      // Create project in editor store
+      const projectName = selectedFile?.name?.replace(/\.[^/.]+$/, "") || `Project ${Date.now()}`;
+      createProject(projectName);
+
+      // Convert data to editor format
+      const editorSegments = convertToEditorFormat();
+
+      // Update project with video data
+      updateProject({
+        videoUrl: videoUrl,
+        duration: videoDuration,
+        segments: editorSegments,
+        // Store original data for potential re-export
+        metadata: {
+          originalFile: selectedFile?.name,
+          transcript,
+          words,
+          keywords,
+          brollImages,
+          subtitlesEnabled,
+          brollsEnabled
+        }
+      });
+
+      // Navigate to editor
+      router.push('/editor');
+    } catch (error) {
+      console.error('Error creating project:', error);
+      setError('Failed to create project. Please try again.');
+    }
+  }, [selectedFile, videoUrl, videoDuration, transcript, words, keywords, brollImages, subtitlesEnabled, brollsEnabled, createProject, updateProject, router]);
 
   // Reset to step 1
   const resetUpload = useCallback(() => {
@@ -131,8 +307,15 @@ export default function VideoUpload() {
     setIsPlaying(false);
     setIsMuted(false);
     setIsGenerating(false);
-    setSubtitlesEnabled(false);
-    setBrollsEnabled(false);
+    setSubtitlesEnabled(true);
+    setBrollsEnabled(true);
+    setTranscript('');
+    setWords([]);
+    setSegments([]);
+    setKeywords([]);
+    setBrollImages({});
+    setError(null);
+    setCurrentProcessStep('');
     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -156,6 +339,14 @@ export default function VideoUpload() {
       <VideoUploadProgress
         selectedFile={selectedFile}
         uploadProgress={uploadProgress}
+        currentStep={currentProcessStep}
+        error={error}
+        onRetry={() => {
+          if (selectedFile) {
+            processVideo(selectedFile);
+          }
+        }}
+        onCancel={resetUpload}
       />
     );
   }
@@ -188,6 +379,12 @@ export default function VideoUpload() {
           onSubtitlesChange={setSubtitlesEnabled}
           onBrollsChange={setBrollsEnabled}
           onGenerate={handleGenerate}
+          // Show processing results
+          transcript={transcript}
+          wordsCount={words.length}
+          segmentsCount={segments.length}
+          keywordsCount={keywords.length}
+          brollImagesCount={Object.values(brollImages).filter(Boolean).length}
         />
       </div>
     );

@@ -28,9 +28,14 @@ function SegmentCard({ segment }: SegmentCardProps) {
   const createSubtitleSegments = (originalSegment: SegmentData): SegmentData[] => {
     if (originalSegment.type !== 'subtitle') return [originalSegment];
     
+    // Safe check for content
+    if (!originalSegment.content || typeof originalSegment.content !== 'string') {
+      return [originalSegment];
+    }
+    
     const chunks = splitTextByWordCount(originalSegment.content, settings.wordCount);
-    const startTime = timeToSeconds(originalSegment.startTime);
-    const endTime = timeToSeconds(originalSegment.endTime);
+    const startTime = timeToSeconds(originalSegment.startTime || '00:00');
+    const endTime = timeToSeconds(originalSegment.endTime || '00:00');
     const duration = endTime - startTime;
     const segmentDuration = duration / chunks.length;
 
@@ -45,8 +50,9 @@ function SegmentCard({ segment }: SegmentCardProps) {
         startTime: formatTime(segmentStartTime),
         endTime: formatTime(segmentEndTime),
         isSelected: selectedSegment?.id === originalSegment.id && index === 0,
-        // Keep highlighted keyword only in the chunk that contains it
-        highlightedKeyword: chunk.toLowerCase().includes(originalSegment.highlightedKeyword?.toLowerCase() || '') 
+        // Safe check for highlighted keyword
+        highlightedKeyword: (chunk && originalSegment.highlightedKeyword && 
+          chunk.toLowerCase().includes(originalSegment.highlightedKeyword.toLowerCase())) 
           ? originalSegment.highlightedKeyword 
           : undefined
       };
@@ -99,8 +105,8 @@ function SegmentCard({ segment }: SegmentCardProps) {
   // Sort segments by start time, then by type (subtitles first if same time)
   // Create a new array using spread operator to avoid mutating the original
   const sortedSegments = [...processedSegments].sort((a, b) => {
-    const timeA = timeToSeconds(a.startTime);
-    const timeB = timeToSeconds(b.startTime);
+    const timeA = timeToSeconds(a.startTime || '00:00');
+    const timeB = timeToSeconds(b.startTime || '00:00');
     
     if (timeA === timeB) {
       // If same start time, show subtitle before b-roll
@@ -112,7 +118,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
 
   // Group segments by same start time
   const groupedSegments = sortedSegments.reduce((groups, segment) => {
-    const startTime = segment.startTime;
+    const startTime = segment.startTime || '00:00';
     if (!groups[startTime]) {
       groups[startTime] = [];
     }
@@ -142,7 +148,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
   const renderSegment = (seg: any) => {
     if (seg.type === 'subtitle') {
       // Check if this is a chunked segment
-      const isChunked = seg.id.includes('-chunk-');
+      const isChunked = seg.id && seg.id.includes('-chunk-');
       const chunkNumber = isChunked ? parseInt(seg.id.split('-chunk-')[1]) + 1 : null;
       
       return (
@@ -158,7 +164,7 @@ function SegmentCard({ segment }: SegmentCardProps) {
           <div className='flex items-center justify-between'>
             <div className="flex items-center gap-2">
               <span className='text-sm text-neutral-400'>
-                {seg.startTime} - {seg.endTime}
+                {seg.startTime || '00:00'} - {seg.endTime || '00:00'}
               </span>
               {chunkNumber && (
                 <span className='text-xs bg-neutral-600 text-neutral-300 px-2 py-1 rounded-full'>
@@ -171,23 +177,34 @@ function SegmentCard({ segment }: SegmentCardProps) {
             </div>
           </div>
           <p className='mt-2 text-neutral-300 text-sm leading-relaxed'>
-            {seg.highlightedKeyword ? (
-              seg.content.split(seg.highlightedKeyword).map((part, index, array) => (
-                <React.Fragment key={index}>
-                  {part}
-                  {index < array.length - 1 && (
-                    <span className='bg-amber-100 text-neutral-900 px-1 pb-1 rounded highlighted-keyword'>
-                      {seg.highlightedKeyword}
-                    </span>
-                  )}
-                </React.Fragment>
-              ))
+            {seg.highlightedKeyword && seg.content ? (
+              (() => {
+                // Safe split with fallback
+                const content = seg.content || '';
+                const keyword = seg.highlightedKeyword || '';
+                
+                if (!content || !keyword) {
+                  return content;
+                }
+                
+                const parts = content.split(keyword);
+                return parts.map((part, index, array) => (
+                  <React.Fragment key={index}>
+                    {part}
+                    {index < array.length - 1 && (
+                      <span className='bg-amber-100 text-neutral-900 px-1 pb-1 rounded highlighted-keyword'>
+                        {keyword}
+                      </span>
+                    )}
+                  </React.Fragment>
+                ));
+              })()
             ) : (
-              seg.content
+              seg.content || 'No content'
             )}
           </p>
           <div className='mt-2 text-xs text-neutral-500'>
-            Words: {seg.content.split(' ').length} / {settings.wordCount}
+            Words: {seg.content ? seg.content.split(' ').length : 0} / {settings.wordCount}
           </div>
         </div>
       );
@@ -214,14 +231,14 @@ function SegmentCard({ segment }: SegmentCardProps) {
           )}
           <div className='flex items-center justify-between relative z-10'>
             <span className='text-[12px] text-neutral-100 bg-neutral-800/90 p-2 px-3 rounded-2xl backdrop-blur'>
-              {seg.startTime} - {seg.endTime}
+              {seg.startTime || '00:00'} - {seg.endTime || '00:00'}
             </span>
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {/* Action buttons commented out as in original */}
             </div>
           </div>
           <span className='text-sm w-fit ml-auto text-neutral-100 bg-neutral-800/90 p-2 leading-normal px-3 rounded-full relative z-10 backdrop-blur'>
-            {seg.content}
+            {seg.content || 'No content'}
           </span>
         </div>
       );
