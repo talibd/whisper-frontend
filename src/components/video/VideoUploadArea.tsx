@@ -36,7 +36,7 @@ export const VideoUploadArea: React.FC<VideoUploadAreaProps> = ({
     if (files && files[0]) {
       handleFile(files[0]);
     }
-  }, [onDragStateChange, onFileSelect]);
+  }, [onDragStateChange]);
 
   const handleFile = (file: File) => {
     if (file?.type.startsWith('video/')) {

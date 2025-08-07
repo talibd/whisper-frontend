@@ -86,6 +86,7 @@ export interface BrollImages {
 
 export interface ProjectMetadata {
   originalFile?: string;
+  originalFileObject?: File; // Store the actual File object (not persisted)
   transcript?: string;
   words?: Word[];
   segments?: Segment[];
@@ -259,12 +260,19 @@ export const useEditorStore = create<EditorState>()(
             state.currentProject = newProject;
             state.selectedSegmentId = null;
             
-            // Add to recent projects
+            // Add to recent projects (without File object for persistence)
+            const projectForStorage = { ...newProject };
+            if (projectForStorage.metadata?.originalFileObject) {
+              // Remove File object before storing
+              const { originalFileObject, ...metadataWithoutFile } = projectForStorage.metadata;
+              projectForStorage.metadata = metadataWithoutFile;
+            }
+            
             const existingIndex = state.recentProjects.findIndex((p: ProjectData) => p.name === name);
             if (existingIndex > -1) {
               state.recentProjects.splice(existingIndex, 1);
             }
-            state.recentProjects.unshift(newProject);
+            state.recentProjects.unshift(projectForStorage);
             
             // Keep only last 10 recent projects
             if (state.recentProjects.length > 10) {
@@ -296,10 +304,16 @@ export const useEditorStore = create<EditorState>()(
               state.currentProject.globalStyle = { ...state.currentStyle };
               state.currentProject.settings = { ...state.editorSettings };
               
-              // Update in recent projects
+              // Update in recent projects (without File object)
+              const projectForStorage = { ...state.currentProject };
+              if (projectForStorage.metadata?.originalFileObject) {
+                const { originalFileObject, ...metadataWithoutFile } = projectForStorage.metadata;
+                projectForStorage.metadata = metadataWithoutFile;
+              }
+              
               const index = state.recentProjects.findIndex((p: ProjectData) => p.id === state.currentProject!.id);
               if (index > -1) {
-                state.recentProjects[index] = { ...state.currentProject };
+                state.recentProjects[index] = projectForStorage;
               }
             }
           });
@@ -476,7 +490,7 @@ export const useEditorStore = create<EditorState>()(
           }, 2000);
         },
 
-        // New backend export function
+        // Updated backend export function
         exportVideoWithBackend: async () => {
           const state = get();
           const project = state.currentProject;
@@ -494,10 +508,11 @@ export const useEditorStore = create<EditorState>()(
             
             const formData = new FormData();
             
-            // Add original file if available (would need to be stored differently in real app)
-            if (project.metadata.originalFile) {
-              // In a real app, you'd need to handle file storage differently
-              // formData.append("file", originalFile);
+            // Add original file if available
+            if (project.metadata.originalFileObject) {
+              formData.append("file", project.metadata.originalFileObject);
+            } else {
+              throw new Error('Original video file not found. Please re-upload your video.');
             }
             
             formData.append("transcript", project.metadata.transcript || '');
@@ -518,7 +533,8 @@ export const useEditorStore = create<EditorState>()(
             });
 
             if (!response.ok) {
-              throw new Error('Export failed');
+              const errorData = await response.json();
+              throw new Error(errorData.detail || 'Export failed');
             }
 
             const result = await response.json();
@@ -533,7 +549,7 @@ export const useEditorStore = create<EditorState>()(
               state.isExporting = false;
               state.exportProgress = 0;
             });
-            return null;
+            throw error; // Re-throw to let the UI handle the error
           }
         },
 
@@ -602,11 +618,24 @@ export const useEditorStore = create<EditorState>()(
     {
       name: 'video-editor-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist certain parts of the state
+      // Only persist certain parts of the state (exclude File objects)
       partialize: (state) => ({
-        recentProjects: state.recentProjects,
+        recentProjects: state.recentProjects.map(project => {
+          if (project.metadata?.originalFileObject) {
+            const { originalFileObject, ...metadataWithoutFile } = project.metadata;
+            return { ...project, metadata: metadataWithoutFile };
+          }
+          return project;
+        }),
         editorSettings: state.editorSettings,
-        currentProject: state.currentProject,
+        currentProject: state.currentProject ? (() => {
+          const project = { ...state.currentProject };
+          if (project.metadata?.originalFileObject) {
+            const { originalFileObject, ...metadataWithoutFile } = project.metadata;
+            project.metadata = metadataWithoutFile;
+          }
+          return project;
+        })() : null,
         suggestions: state.suggestions.slice(0, 10), // Only keep 10 most recent
       }),
     }

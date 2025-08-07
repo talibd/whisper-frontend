@@ -37,7 +37,7 @@ export const VideoUploadProgress: React.FC<VideoUploadProgressProps> = ({
     <div className="w-[400px] bg-neutral-800 p-6 rounded-xl">
       <div className="text-center">
         <h2 className="text-xl text-white mb-2">Processing Video</h2>
-        <p className="text-sm text-neutral-400 mb-6">
+        <p className="text-sm text-neutral-400 mb-6 truncate">
           {selectedFile?.name || 'your-video.mp4'}
         </p>
 
@@ -117,11 +117,11 @@ export const VideoUploadProgress: React.FC<VideoUploadProgressProps> = ({
         )}
 
         {/* Loading Animation */}
-        {!error && uploadProgress < 100 && (
+        {/* {!error && uploadProgress < 100 && (
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

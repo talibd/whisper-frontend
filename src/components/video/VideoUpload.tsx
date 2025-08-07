@@ -270,16 +270,18 @@ export default function VideoUpload() {
       // Convert data to editor format
       const editorSegments = convertToEditorFormat();
 
-      // Update project with video data
+      // Update project with video data AND store the original file
       updateProject({
         videoUrl: videoUrl,
         duration: videoDuration,
         segments: editorSegments,
+        originalFile: selectedFile, // Store the original file for export
         // Store original data for potential re-export
         metadata: {
           originalFile: selectedFile?.name,
           transcript,
           words,
+          segments,
           keywords,
           brollImages,
           subtitlesEnabled,
@@ -293,7 +295,7 @@ export default function VideoUpload() {
       console.error('Error creating project:', error);
       setError('Failed to create project. Please try again.');
     }
-  }, [selectedFile, videoUrl, videoDuration, transcript, words, keywords, brollImages, subtitlesEnabled, brollsEnabled, createProject, updateProject, router]);
+  }, [selectedFile, videoUrl, videoDuration, transcript, words, segments, keywords, brollImages, subtitlesEnabled, brollsEnabled, createProject, updateProject, router]);
 
   // Reset to step 1
   const resetUpload = useCallback(() => {

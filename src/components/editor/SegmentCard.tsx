@@ -33,6 +33,9 @@ function SegmentCard({ segment }: SegmentCardProps) {
       return [originalSegment];
     }
     
+    // Ensure segment has an ID
+    const baseId = originalSegment.id || `segment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const chunks = splitTextByWordCount(originalSegment.content, settings.wordCount);
     const startTime = timeToSeconds(originalSegment.startTime || '00:00');
     const endTime = timeToSeconds(originalSegment.endTime || '00:00');
@@ -45,11 +48,11 @@ function SegmentCard({ segment }: SegmentCardProps) {
 
       return {
         ...originalSegment,
-        id: index === 0 ? originalSegment.id : `${originalSegment.id}-chunk-${index}`,
+        id: index === 0 ? baseId : `${baseId}-chunk-${index}`,
         content: chunk,
         startTime: formatTime(segmentStartTime),
         endTime: formatTime(segmentEndTime),
-        isSelected: selectedSegment?.id === originalSegment.id && index === 0,
+        isSelected: selectedSegment?.id === baseId && index === 0,
         // Safe check for highlighted keyword
         highlightedKeyword: (chunk && originalSegment.highlightedKeyword && 
           chunk.toLowerCase().includes(originalSegment.highlightedKeyword.toLowerCase())) 
@@ -100,7 +103,14 @@ function SegmentCard({ segment }: SegmentCardProps) {
   ];
 
   // Process segments to split subtitles based on word count
-  const processedSegments = rawSegments.flatMap(seg => createSubtitleSegments(seg));
+  const processedSegments = rawSegments.flatMap((seg, index) => {
+    // Ensure each segment has a unique ID
+    const segmentWithId = {
+      ...seg,
+      id: seg.id || `fallback-${index}-${Date.now()}`
+    };
+    return createSubtitleSegments(segmentWithId);
+  });
 
   // Sort segments by start time, then by type (subtitles first if same time)
   // Create a new array using spread operator to avoid mutating the original
@@ -184,12 +194,12 @@ function SegmentCard({ segment }: SegmentCardProps) {
                 const keyword = seg.highlightedKeyword || '';
                 
                 if (!content || !keyword) {
-                  return content;
+                  return content ;
                 }
                 
                 const parts = content.split(keyword);
                 return parts.map((part, index, array) => (
-                  <React.Fragment key={index}>
+                  <React.Fragment key={`keyword-${seg.id}-${index}`}>
                     {part}
                     {index < array.length - 1 && (
                       <span className='bg-amber-100 text-neutral-900 px-1 pb-1 rounded highlighted-keyword'>
@@ -248,9 +258,9 @@ function SegmentCard({ segment }: SegmentCardProps) {
   return (
     <div className="space-y-4">
       {Object.entries(groupedSegments).map(([startTime, segments]) => (
-        <div key={startTime} className="space-y-2">
-          {segments.map((seg) => (
-            <div key={seg.id}>
+        <div key={`group-${startTime}-${segments.length}`} className="space-y-2">
+          {segments.map((seg, segIndex) => (
+            <div key={`segment-${seg.id || `missing-${segIndex}-${startTime}`}`}>
               {renderSegment(seg)}
             </div>
           ))}

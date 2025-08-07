@@ -62,6 +62,9 @@ export default function VideoCard() {
     });
   };
 
+  // Get video URL from project or use demo
+  const videoUrl = project?.videoUrl || '/demo.mp4';
+
   // Demo segments if no project data
   const rawSegments = project?.segments || [
     {
@@ -222,12 +225,21 @@ export default function VideoCard() {
     }
   }, [])
 
+  // Reset video when project changes
+  useEffect(() => {
+    if (videoRef.current && project?.videoUrl) {
+      videoRef.current.load(); // Reload the video with new source
+      setCurrentTime(0);
+      setIsPlaying(false);
+    }
+  }, [project?.videoUrl]);
+
   return (
     <div className="relative">
       <video 
         ref={videoRef}
         className="w-full max-w-[300px] aspect-[9/16] object-cover rounded-xl"
-        src="/demo.mp4"
+        src={videoUrl}
         playsInline
         disablePictureInPicture
         controlsList="nodownload nofullscreen noremoteplayback"
@@ -264,13 +276,6 @@ export default function VideoCard() {
         </div>
       )}
 
-      {/* Word Count Indicator */}
-      {/* {activeSubtitle && (
-        <div className="absolute top-4 left-4 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none">
-          Words: {activeSubtitle.content.split(' ').length}/{settings.wordCount}
-        </div>
-      )} */}
-
       {/* Play/Pause Button */}
       <div className="absolute -bottom-15 left-1/2 transform -translate-x-1/2">
         <button
@@ -285,6 +290,13 @@ export default function VideoCard() {
           )}
         </button>
       </div>
+
+      {/* Project Info Display */}
+      {/* {project && (
+        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded pointer-events-none">
+          {project.name}
+        </div>
+      )} */}
     </div>
   )
 }
